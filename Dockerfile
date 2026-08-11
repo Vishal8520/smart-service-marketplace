@@ -8,6 +8,6 @@ RUN mvn clean package -DskipTests
 # Run Stage
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
-COPY --from=builder /app/target/smart-service-marketplace-*.jar app.jar
+COPY --from=builder /app/target/smart-service-marketplace-*.*ar app.jar
 EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "app.jar"]
