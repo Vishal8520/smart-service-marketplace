@@ -34,7 +34,13 @@ public class JwtConfig {
 
     @Bean
     public SecretKey jwtSecretKey() {
-        byte[] keyBytes = HexFormat.of().parseHex(secret);
+        String cleanSecret = secret != null ? secret.trim() : "";
+        byte[] keyBytes;
+        try {
+            keyBytes = HexFormat.of().parseHex(cleanSecret);
+        } catch (Exception e) {
+            keyBytes = cleanSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        }
         return Keys.hmacShaKeyFor(keyBytes);
     }
 }
