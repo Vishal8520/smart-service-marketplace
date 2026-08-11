@@ -19,14 +19,14 @@ public class User {
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
-    @Column(nullable = false)
+    @Column
     private String password;
 
     @Column(length = 20)
     private String phone;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 30, columnDefinition = "VARCHAR(30)")
     private RoleType role;
 
     @CreatedDate

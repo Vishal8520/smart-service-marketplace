@@ -1,23 +1,20 @@
--- V2: Seed Data
+-- V2: Seed Default Categories and Admin User
+INSERT IGNORE INTO categories (id, name, description) VALUES
+(1, 'Plumbing',            'Pipe repair, installation, drain cleaning and emergency plumbing'),
+(2, 'Electrical',          'Wiring, fixtures, panel upgrades and electrical safety'),
+(3, 'Home Cleaning',       'Deep cleaning, regular housekeeping, sofa & carpet care'),
+(4, 'Tutoring',            'Academic tutoring for school & college subjects'),
+(5, 'Graphic Design',      'Logos, branding, print & digital visual assets'),
+(6, 'Web Development',     'Custom websites, web apps and API integration'),
+(7, 'Carpentry',           'Furniture assembly, custom woodwork and repairs'),
+(8, 'Pest Control',        'Extermination of cockroaches, termites and bed bugs');
 
--- Categories
-INSERT INTO categories (name, description) VALUES
-    ('Plumbing',            'Pipe repair, installation, drain cleaning'),
-    ('Electrical',          'Wiring, fixtures, panel upgrades'),
-    ('Home Cleaning',       'Deep cleaning, regular housekeeping'),
-    ('Tutoring',            'Academic tutoring for all subjects'),
-    ('Graphic Design',      'Logos, branding, print & digital design'),
-    ('Web Development',     'Custom websites and web applications'),
-    ('Carpentry',           'Furniture, woodwork, repairs'),
-    ('AC & Appliance',      'AC service, washing machine, refrigerator repair'),
-    ('Painting',            'Interior and exterior painting services'),
-    ('Personal Training',   'Fitness coaching and workout planning');
-
--- Admin user (password: Admin@123 — bcrypt hash)
-INSERT INTO users (name, email, password, phone, role) VALUES (
-    'System Admin',
-    'admin@marketplace.com',
-    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lh',
-    '+910000000000',
-    'ADMIN'
+-- Admin user (password: Admin@123)
+INSERT IGNORE INTO users (id, name, email, password, phone, role) VALUES (
+1,
+'System Admin',
+'admin@marketplace.com',
+'$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lh',
+'+910000000000',
+'ADMIN'
 );

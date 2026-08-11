@@ -25,6 +25,8 @@ public class ServiceRequest {
     @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
     private BigDecimal price;
 
+    private String providerEmail;
+
     private List<String> tags;
 
     public ServiceRequest() {
@@ -60,6 +62,14 @@ public class ServiceRequest {
 
     public void setPrice(BigDecimal price) {
         this.price = price;
+    }
+
+    public String getProviderEmail() {
+        return providerEmail;
+    }
+
+    public void setProviderEmail(String providerEmail) {
+        this.providerEmail = providerEmail;
     }
 
     public List<String> getTags() {

@@ -12,9 +12,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -29,53 +26,52 @@ public class BookingController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('CUSTOMER')")
-    @Operation(summary = "Book a service (Customer role required)")
-    public ResponseEntity<BookingResponse> createBooking(
-            @Valid @RequestBody BookingRequest request,
-            @AuthenticationPrincipal UserDetails userDetails) {
+    @Operation(summary = "Book a service with customer details & address (Passwordless Flow)")
+    public ResponseEntity<BookingResponse> createBooking(@Valid @RequestBody BookingRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(bookingService.createBooking(request, userDetails.getUsername()));
+                .body(bookingService.createBooking(request, request.getCustomerEmail()));
     }
 
-    @GetMapping("/me")
-    @PreAuthorize("hasRole('CUSTOMER')")
-    @Operation(summary = "Get bookings for the logged-in customer")
+    @PostMapping("/{id}/pay")
+    @Operation(summary = "Simulate payment completion — Unlocks Provider Contact Info (Server-Side)")
+    public ResponseEntity<BookingResponse> payBooking(@PathVariable Long id) {
+        return ResponseEntity.ok(bookingService.payBooking(id));
+    }
+
+    @GetMapping("/customer")
+    @Operation(summary = "Get bookings for customer by email")
     public ResponseEntity<Page<BookingResponse>> getCustomerBookings(
+            @RequestParam String email,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(bookingService.getCustomerBookings(userDetails.getUsername(), pageable));
+        return ResponseEntity.ok(bookingService.getCustomerBookings(email, pageable));
     }
 
     @GetMapping("/provider")
-    @PreAuthorize("hasRole('SERVICE_PROVIDER')")
-    @Operation(summary = "Get incoming bookings for the logged-in provider")
+    @Operation(summary = "Get incoming bookings for provider by email")
     public ResponseEntity<Page<BookingResponse>> getProviderBookings(
+            @RequestParam String email,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(bookingService.getProviderBookings(userDetails.getUsername(), pageable));
+        return ResponseEntity.ok(bookingService.getProviderBookings(email, pageable));
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasRole('SERVICE_PROVIDER')")
-    @Operation(summary = "Update booking status (CONFIRMED, COMPLETED, CANCELLED) — Provider only")
+    @Operation(summary = "Update booking status — Provider view")
     public ResponseEntity<BookingResponse> updateStatus(
             @PathVariable Long id,
             @Valid @RequestBody BookingStatusRequest request,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.ok(bookingService.updateStatus(id, request, userDetails.getUsername()));
+            @RequestParam(required = false) String providerEmail) {
+        return ResponseEntity.ok(bookingService.updateStatus(id, request, providerEmail));
     }
 
     @PatchMapping("/{id}/cancel")
-    @PreAuthorize("hasRole('CUSTOMER')")
-    @Operation(summary = "Cancel a booking — Customer only")
+    @Operation(summary = "Cancel a booking")
     public ResponseEntity<BookingResponse> cancelBooking(
             @PathVariable Long id,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.ok(bookingService.cancelBooking(id, userDetails.getUsername()));
+            @RequestParam(required = false) String customerEmail) {
+        return ResponseEntity.ok(bookingService.cancelBooking(id, customerEmail));
     }
 }

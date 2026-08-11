@@ -25,7 +25,7 @@ public class Payment {
     private String currency = "INR";
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 20, columnDefinition = "VARCHAR(20)")
     private PaymentStatus status = PaymentStatus.INITIATED;
 
     @Column(name = "gateway_order_id", length = 100)

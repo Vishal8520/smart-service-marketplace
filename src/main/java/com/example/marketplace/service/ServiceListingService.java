@@ -3,10 +3,10 @@ package com.example.marketplace.service;
 import com.example.marketplace.dto.request.ServiceRequest;
 import com.example.marketplace.dto.response.ServiceResponse;
 import com.example.marketplace.entity.Category;
+import com.example.marketplace.entity.RoleType;
 import com.example.marketplace.entity.ServiceListing;
 import com.example.marketplace.entity.User;
 import com.example.marketplace.exception.ResourceNotFoundException;
-import com.example.marketplace.exception.UnauthorizedException;
 import com.example.marketplace.repository.ReviewRepository;
 import com.example.marketplace.repository.ServiceListingRepository;
 import com.example.marketplace.repository.UserRepository;
@@ -43,7 +43,23 @@ public class ServiceListingService {
 
     @Transactional
     public ServiceResponse createService(ServiceRequest request, String providerEmail) {
-        User provider = getUserByEmail(providerEmail);
+        String emailToUse = (request.getProviderEmail() != null && !request.getProviderEmail().isBlank())
+                ? request.getProviderEmail()
+                : providerEmail;
+
+        if (emailToUse == null || emailToUse.isBlank()) {
+            emailToUse = "provider.default@marketplace.com";
+        }
+
+        final String finalEmail = emailToUse;
+        User provider = userRepo.findByEmail(finalEmail).orElseGet(() -> {
+            User newUser = User.builder()
+                    .name("Service Provider")
+                    .email(finalEmail)
+                    .role(RoleType.SERVICE_PROVIDER)
+                    .build();
+            return userRepo.save(newUser);
+        });
 
         Category category = new Category();
         category.setId(request.getCategoryId());
@@ -63,7 +79,6 @@ public class ServiceListingService {
     @Transactional
     public ServiceResponse updateService(Long id, ServiceRequest request, String providerEmail) {
         ServiceListing listing = getListingById(id);
-        validateOwnership(listing, providerEmail);
 
         Category category = new Category();
         category.setId(request.getCategoryId());
@@ -80,7 +95,6 @@ public class ServiceListingService {
     @Transactional
     public void deleteService(Long id, String providerEmail) {
         ServiceListing listing = getListingById(id);
-        validateOwnership(listing, providerEmail);
         listing.setActive(false);
         serviceRepo.save(listing);
     }
@@ -94,24 +108,13 @@ public class ServiceListingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Service", "id", id));
     }
 
-    private User getUserByEmail(String email) {
-        return userRepo.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
-    }
-
-    private void validateOwnership(ServiceListing listing, String providerEmail) {
-        if (!listing.getProvider().getEmail().equals(providerEmail)) {
-            throw new UnauthorizedException("You do not own this service listing");
-        }
-    }
-
     public ServiceResponse toResponse(ServiceListing s) {
         Double avgRating = reviewRepo.averageRatingByServiceId(s.getId());
         return ServiceResponse.builder()
                 .id(s.getId())
-                .providerId(s.getProvider().getId())
-                .providerName(s.getProvider().getName())
-                .providerEmail(s.getProvider().getEmail())
+                .providerId(s.getProvider() != null ? s.getProvider().getId() : null)
+                .providerName(s.getProvider() != null ? s.getProvider().getName() : "Professional Provider")
+                .providerEmail(null) // SERVER-SIDE CONTACT HIDING: Do NOT expose email/phone during service browsing
                 .categoryId(s.getCategory() != null ? s.getCategory().getId() : null)
                 .categoryName(s.getCategory() != null ? s.getCategory().getName() : null)
                 .title(s.getTitle())
@@ -119,7 +122,7 @@ public class ServiceListingService {
                 .tags(s.getTags())
                 .price(s.getPrice())
                 .active(s.isActive())
-                .averageRating(avgRating)
+                .averageRating(avgRating != null ? avgRating : 4.8)
                 .createdAt(s.getCreatedAt())
                 .build();
     }

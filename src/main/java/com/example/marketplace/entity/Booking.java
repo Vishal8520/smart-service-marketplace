@@ -25,8 +25,11 @@ public class Booking {
     private Instant scheduledAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 20, columnDefinition = "VARCHAR(20)")
     private BookingStatus status = BookingStatus.PENDING;
+
+    @Column(columnDefinition = "TEXT")
+    private String address;
 
     @Column(length = 500)
     private String notes;
@@ -39,12 +42,13 @@ public class Booking {
     }
 
     public Booking(Long id, User customer, ServiceListing service, Instant scheduledAt, BookingStatus status,
-            String notes, Instant createdAt) {
+            String address, String notes, Instant createdAt) {
         this.id = id;
         this.customer = customer;
         this.service = service;
         this.scheduledAt = scheduledAt;
         this.status = status != null ? status : BookingStatus.PENDING;
+        this.address = address;
         this.notes = notes;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
     }
@@ -59,6 +63,7 @@ public class Booking {
         private ServiceListing service;
         private Instant scheduledAt;
         private BookingStatus status = BookingStatus.PENDING;
+        private String address;
         private String notes;
         private Instant createdAt;
 
@@ -87,6 +92,11 @@ public class Booking {
             return this;
         }
 
+        public Builder address(String address) {
+            this.address = address;
+            return this;
+        }
+
         public Builder notes(String notes) {
             this.notes = notes;
             return this;
@@ -98,7 +108,7 @@ public class Booking {
         }
 
         public Booking build() {
-            return new Booking(id, customer, service, scheduledAt, status, notes, createdAt);
+            return new Booking(id, customer, service, scheduledAt, status, address, notes, createdAt);
         }
     }
 
@@ -140,6 +150,14 @@ public class Booking {
 
     public void setStatus(BookingStatus status) {
         this.status = status;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
     }
 
     public String getNotes() {

@@ -10,11 +10,16 @@ public class BookingResponse {
     private Long id;
     private Long customerId;
     private String customerName;
+    private String customerEmail;
+    private String customerPhone;
     private Long serviceId;
     private String serviceTitle;
     private BigDecimal price;
     private Long providerId;
     private String providerName;
+    private String providerPhone;
+    private String providerEmail;
+    private String address;
     private Instant scheduledAt;
     private BookingStatus status;
     private String notes;
@@ -23,17 +28,23 @@ public class BookingResponse {
     public BookingResponse() {
     }
 
-    public BookingResponse(Long id, Long customerId, String customerName, Long serviceId, String serviceTitle,
-            BigDecimal price, Long providerId, String providerName, Instant scheduledAt, BookingStatus status,
+    public BookingResponse(Long id, Long customerId, String customerName, String customerEmail, String customerPhone,
+            Long serviceId, String serviceTitle, BigDecimal price, Long providerId, String providerName,
+            String providerPhone, String providerEmail, String address, Instant scheduledAt, BookingStatus status,
             String notes, Instant createdAt) {
         this.id = id;
         this.customerId = customerId;
         this.customerName = customerName;
+        this.customerEmail = customerEmail;
+        this.customerPhone = customerPhone;
         this.serviceId = serviceId;
         this.serviceTitle = serviceTitle;
         this.price = price;
         this.providerId = providerId;
         this.providerName = providerName;
+        this.providerPhone = providerPhone;
+        this.providerEmail = providerEmail;
+        this.address = address;
         this.scheduledAt = scheduledAt;
         this.status = status;
         this.notes = notes;
@@ -48,11 +59,16 @@ public class BookingResponse {
         private Long id;
         private Long customerId;
         private String customerName;
+        private String customerEmail;
+        private String customerPhone;
         private Long serviceId;
         private String serviceTitle;
         private BigDecimal price;
         private Long providerId;
         private String providerName;
+        private String providerPhone;
+        private String providerEmail;
+        private String address;
         private Instant scheduledAt;
         private BookingStatus status;
         private String notes;
@@ -70,6 +86,16 @@ public class BookingResponse {
 
         public Builder customerName(String customerName) {
             this.customerName = customerName;
+            return this;
+        }
+
+        public Builder customerEmail(String customerEmail) {
+            this.customerEmail = customerEmail;
+            return this;
+        }
+
+        public Builder customerPhone(String customerPhone) {
+            this.customerPhone = customerPhone;
             return this;
         }
 
@@ -98,6 +124,21 @@ public class BookingResponse {
             return this;
         }
 
+        public Builder providerPhone(String providerPhone) {
+            this.providerPhone = providerPhone;
+            return this;
+        }
+
+        public Builder providerEmail(String providerEmail) {
+            this.providerEmail = providerEmail;
+            return this;
+        }
+
+        public Builder address(String address) {
+            this.address = address;
+            return this;
+        }
+
         public Builder scheduledAt(Instant scheduledAt) {
             this.scheduledAt = scheduledAt;
             return this;
@@ -119,8 +160,9 @@ public class BookingResponse {
         }
 
         public BookingResponse build() {
-            return new BookingResponse(id, customerId, customerName, serviceId, serviceTitle, price, providerId,
-                    providerName, scheduledAt, status, notes, createdAt);
+            return new BookingResponse(id, customerId, customerName, customerEmail, customerPhone, serviceId,
+                    serviceTitle, price, providerId, providerName, providerPhone, providerEmail, address, scheduledAt,
+                    status, notes, createdAt);
         }
     }
 
@@ -146,6 +188,22 @@ public class BookingResponse {
 
     public void setCustomerName(String customerName) {
         this.customerName = customerName;
+    }
+
+    public String getCustomerEmail() {
+        return customerEmail;
+    }
+
+    public void setCustomerEmail(String customerEmail) {
+        this.customerEmail = customerEmail;
+    }
+
+    public String getCustomerPhone() {
+        return customerPhone;
+    }
+
+    public void setCustomerPhone(String customerPhone) {
+        this.customerPhone = customerPhone;
     }
 
     public Long getServiceId() {
@@ -186,6 +244,30 @@ public class BookingResponse {
 
     public void setProviderName(String providerName) {
         this.providerName = providerName;
+    }
+
+    public String getProviderPhone() {
+        return providerPhone;
+    }
+
+    public void setProviderPhone(String providerPhone) {
+        this.providerPhone = providerPhone;
+    }
+
+    public String getProviderEmail() {
+        return providerEmail;
+    }
+
+    public void setProviderEmail(String providerEmail) {
+        this.providerEmail = providerEmail;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
     }
 
     public Instant getScheduledAt() {

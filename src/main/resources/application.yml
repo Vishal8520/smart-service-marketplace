@@ -3,10 +3,13 @@ spring:
     name: smart-service-marketplace
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/marketplace_db}
-    username: ${DB_USERNAME:marketplace_user}
-    password: ${DB_PASSWORD:marketplace_pass}
-    driver-class-name: org.postgresql.Driver
+    url: ${DB_URL:jdbc:mysql://localhost:3306/marketplace_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:Vishal@8696}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-timeout: 30000
+      maximum-pool-size: 5
 
   jpa:
     hibernate:
@@ -14,7 +17,7 @@ spring:
     show-sql: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+        dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
 
   flyway:

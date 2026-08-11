@@ -3,6 +3,10 @@ target/
 *.jar
 *.war
 *.log
+startup_err.txt
+build.txt
+compile.txt
+compile_ui_result.txt
 TestDB.java
 .idea/
 .vscode/

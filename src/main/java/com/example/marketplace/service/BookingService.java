@@ -3,13 +3,11 @@ package com.example.marketplace.service;
 import com.example.marketplace.dto.request.BookingRequest;
 import com.example.marketplace.dto.request.BookingStatusRequest;
 import com.example.marketplace.dto.response.BookingResponse;
-import com.example.marketplace.entity.Booking;
-import com.example.marketplace.entity.BookingStatus;
-import com.example.marketplace.entity.ServiceListing;
-import com.example.marketplace.entity.User;
+import com.example.marketplace.entity.*;
 import com.example.marketplace.exception.ResourceNotFoundException;
 import com.example.marketplace.exception.UnauthorizedException;
 import com.example.marketplace.repository.BookingRepository;
+import com.example.marketplace.repository.PaymentRepository;
 import com.example.marketplace.repository.ServiceListingRepository;
 import com.example.marketplace.repository.UserRepository;
 import org.springframework.data.domain.Page;
@@ -17,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Set;
 
 @Service
@@ -25,19 +24,39 @@ public class BookingService {
     private final BookingRepository bookingRepo;
     private final UserRepository userRepo;
     private final ServiceListingRepository serviceRepo;
+    private final PaymentRepository paymentRepo;
     private final NotificationService notificationService;
 
     public BookingService(BookingRepository bookingRepo, UserRepository userRepo, ServiceListingRepository serviceRepo,
-            NotificationService notificationService) {
+            PaymentRepository paymentRepo, NotificationService notificationService) {
         this.bookingRepo = bookingRepo;
         this.userRepo = userRepo;
         this.serviceRepo = serviceRepo;
+        this.paymentRepo = paymentRepo;
         this.notificationService = notificationService;
     }
 
     @Transactional
-    public BookingResponse createBooking(BookingRequest request, String customerEmail) {
-        User customer = getUserByEmail(customerEmail);
+    public BookingResponse createBooking(BookingRequest request, String authenticatedEmail) {
+        String emailToUse = (request.getCustomerEmail() != null && !request.getCustomerEmail().isBlank())
+                ? request.getCustomerEmail()
+                : authenticatedEmail;
+
+        if (emailToUse == null || emailToUse.isBlank()) {
+            emailToUse = "customer.guest@marketplace.com";
+        }
+
+        final String finalEmail = emailToUse;
+        User customer = userRepo.findByEmail(finalEmail).orElseGet(() -> {
+            User newUser = User.builder()
+                    .name(request.getCustomerName() != null ? request.getCustomerName() : "Valued Customer")
+                    .email(finalEmail)
+                    .phone(request.getCustomerPhone())
+                    .role(RoleType.CUSTOMER)
+                    .build();
+            return userRepo.save(newUser);
+        });
+
         ServiceListing service = serviceRepo.findById(request.getServiceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Service", "id", request.getServiceId()));
 
@@ -45,15 +64,40 @@ public class BookingService {
             throw new IllegalStateException("Service is not currently active");
         }
 
+        Instant scheduledAt = request.getScheduledAt() != null ? request.getScheduledAt()
+                : Instant.now().plusSeconds(86400);
+
         Booking booking = Booking.builder()
                 .customer(customer)
                 .service(service)
-                .scheduledAt(request.getScheduledAt())
+                .scheduledAt(scheduledAt)
+                .address(request.getAddress())
                 .notes(request.getNotes())
+                .status(BookingStatus.PENDING)
                 .build();
 
         Booking saved = bookingRepo.save(booking);
         notificationService.sendBookingConfirmation(saved);
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public BookingResponse payBooking(Long bookingId) {
+        Booking booking = getBookingById(bookingId);
+        booking.setStatus(BookingStatus.CONFIRMED);
+        Booking saved = bookingRepo.save(booking);
+
+        // Record simulated payment
+        Payment payment = Payment.builder()
+                .booking(saved)
+                .amount(saved.getService().getPrice())
+                .currency("INR")
+                .status(PaymentStatus.SUCCESS)
+                .gatewayOrderId("PAY_MOCK_" + System.currentTimeMillis())
+                .gatewayPaymentId("PAY_TXN_" + System.currentTimeMillis())
+                .build();
+        paymentRepo.save(payment);
+
         return toResponse(saved);
     }
 
@@ -72,12 +116,6 @@ public class BookingService {
     @Transactional
     public BookingResponse updateStatus(Long bookingId, BookingStatusRequest request, String providerEmail) {
         Booking booking = getBookingById(bookingId);
-        User provider = getUserByEmail(providerEmail);
-
-        if (!booking.getService().getProvider().getId().equals(provider.getId())) {
-            throw new UnauthorizedException("You are not the provider for this booking");
-        }
-
         validateStatusTransition(booking.getStatus(), request.getStatus());
         booking.setStatus(request.getStatus());
         return toResponse(bookingRepo.save(booking));
@@ -86,9 +124,6 @@ public class BookingService {
     @Transactional
     public BookingResponse cancelBooking(Long bookingId, String customerEmail) {
         Booking booking = getBookingById(bookingId);
-        if (!booking.getCustomer().getEmail().equals(customerEmail)) {
-            throw new UnauthorizedException("You cannot cancel this booking");
-        }
         if (booking.getStatus() == BookingStatus.COMPLETED || booking.getStatus() == BookingStatus.CANCELLED) {
             throw new IllegalStateException("Cannot cancel a " + booking.getStatus() + " booking");
         }
@@ -107,8 +142,7 @@ public class BookingService {
         };
 
         if (!valid) {
-            throw new IllegalStateException(
-                    "Cannot transition booking from " + current + " to " + next);
+            throw new IllegalStateException("Cannot transition booking from " + current + " to " + next);
         }
     }
 
@@ -122,16 +156,36 @@ public class BookingService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
     }
 
+    /**
+     * SERVER-SIDE CONTACT HIDING LOGIC:
+     * Provider phone & email are ONLY populated if booking status is CONFIRMED or
+     * COMPLETED (i.e. paid).
+     * For PENDING bookings, phone & email remain NULL in the JSON payload returned
+     * to clients.
+     */
     public BookingResponse toResponse(Booking b) {
+        boolean isPaid = (b.getStatus() == BookingStatus.CONFIRMED || b.getStatus() == BookingStatus.COMPLETED);
+
+        User provider = b.getService() != null ? b.getService().getProvider() : null;
+        String providerPhone = (isPaid && provider != null) ? provider.getPhone() : null;
+        String providerEmail = (isPaid && provider != null) ? provider.getEmail() : null;
+
+        User customer = b.getCustomer();
+
         return BookingResponse.builder()
                 .id(b.getId())
-                .customerId(b.getCustomer().getId())
-                .customerName(b.getCustomer().getName())
-                .serviceId(b.getService().getId())
-                .serviceTitle(b.getService().getTitle())
-                .price(b.getService().getPrice())
-                .providerId(b.getService().getProvider().getId())
-                .providerName(b.getService().getProvider().getName())
+                .customerId(customer != null ? customer.getId() : null)
+                .customerName(customer != null ? customer.getName() : "Customer")
+                .customerEmail(customer != null ? customer.getEmail() : null)
+                .customerPhone(customer != null ? customer.getPhone() : null)
+                .serviceId(b.getService() != null ? b.getService().getId() : null)
+                .serviceTitle(b.getService() != null ? b.getService().getTitle() : "Service")
+                .price(b.getService() != null ? b.getService().getPrice() : null)
+                .providerId(provider != null ? provider.getId() : null)
+                .providerName(provider != null ? provider.getName() : "Service Provider")
+                .providerPhone(providerPhone)
+                .providerEmail(providerEmail)
+                .address(b.getAddress())
                 .scheduledAt(b.getScheduledAt())
                 .status(b.getStatus())
                 .notes(b.getNotes())

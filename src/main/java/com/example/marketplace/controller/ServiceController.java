@@ -12,9 +12,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -44,38 +41,32 @@ public class ServiceController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get detailed information for a single service listing")
+    @Operation(summary = "Get detailed information for a single service listing (Provider contact details hidden)")
     public ResponseEntity<ServiceResponse> getService(@PathVariable Long id) {
         return ResponseEntity.ok(serviceListingService.getService(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('SERVICE_PROVIDER')")
-    @Operation(summary = "Create a new service listing (Service Provider role required)")
-    public ResponseEntity<ServiceResponse> createService(
-            @Valid @RequestBody ServiceRequest request,
-            @AuthenticationPrincipal UserDetails userDetails) {
+    @Operation(summary = "Create a new service listing (Passwordless Provider Flow)")
+    public ResponseEntity<ServiceResponse> createService(@Valid @RequestBody ServiceRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(serviceListingService.createService(request, userDetails.getUsername()));
+                .body(serviceListingService.createService(request, request.getProviderEmail()));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('SERVICE_PROVIDER')")
-    @Operation(summary = "Update an existing service listing (Owner provider only)")
+    @Operation(summary = "Update an existing service listing")
     public ResponseEntity<ServiceResponse> updateService(
             @PathVariable Long id,
-            @Valid @RequestBody ServiceRequest request,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.ok(serviceListingService.updateService(id, request, userDetails.getUsername()));
+            @Valid @RequestBody ServiceRequest request) {
+        return ResponseEntity.ok(serviceListingService.updateService(id, request, request.getProviderEmail()));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('SERVICE_PROVIDER')")
-    @Operation(summary = "Deactivate a service listing (Owner provider only)")
+    @Operation(summary = "Deactivate a service listing")
     public ResponseEntity<Void> deleteService(
             @PathVariable Long id,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        serviceListingService.deleteService(id, userDetails.getUsername());
+            @RequestParam(required = false) String providerEmail) {
+        serviceListingService.deleteService(id, providerEmail);
         return ResponseEntity.noContent().build();
     }
 }

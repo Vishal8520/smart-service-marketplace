@@ -4,16 +4,12 @@ spring:
       on-profile: dev
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/marketplace_db
-    username: marketplace_user
-    password: marketplace_pass
+    url: jdbc:mysql://localhost:3306/marketplace_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    username: root
+    password: Vishal@8696
 
   jpa:
     show-sql: true
-
-  mail:
-    host: localhost
-    port: 1025
 
 logging:
   level:
