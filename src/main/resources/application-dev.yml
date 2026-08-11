@@ -1,0 +1,22 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/marketplace_db
+    username: marketplace_user
+    password: marketplace_pass
+
+  jpa:
+    show-sql: true
+
+  mail:
+    host: localhost
+    port: 1025
+
+logging:
+  level:
+    com.example.marketplace: DEBUG
+    org.springframework.security: DEBUG
+    org.flywaydb: DEBUG

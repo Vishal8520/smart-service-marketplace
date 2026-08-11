@@ -1,0 +1,78 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------------< com.example:smart-service-marketplace >----------------
+[INFO] Building Smart Service Marketplace 1.0.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ smart-service-marketplace ---
+[INFO] Deleting C:\Users\kumaw\OneDrive\Desktop\major project\smart-service-marketplace\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ smart-service-marketplace ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ smart-service-marketplace ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 55 source files with javac [debug parameters release 17] to target\classes
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /C:/Users/kumaw/OneDrive/Desktop/major project/smart-service-marketplace/src/main/java/com/example/marketplace/service/AdminService.java:[34,45] cannot find symbol
+  symbol:   method countByRole(com.example.marketplace.entity.RoleType)
+  location: variable userRepository of type com.example.marketplace.repository.UserRepository
+[ERROR] /C:/Users/kumaw/OneDrive/Desktop/major project/smart-service-marketplace/src/main/java/com/example/marketplace/service/AdminService.java:[35,45] cannot find symbol
+  symbol:   method countByRole(com.example.marketplace.entity.RoleType)
+  location: variable userRepository of type com.example.marketplace.repository.UserRepository
+[ERROR] /C:/Users/kumaw/OneDrive/Desktop/major project/smart-service-marketplace/src/main/java/com/example/marketplace/service/AdminService.java:[43,52] cannot find symbol
+  symbol:   method calculateTotalPlatformRevenue()
+  location: variable paymentRepository of type com.example.marketplace.repository.PaymentRepository
+[ERROR] /C:/Users/kumaw/OneDrive/Desktop/major project/smart-service-marketplace/src/main/java/com/example/marketplace/service/AdminService.java:[48,44] cannot find symbol
+  symbol:   method findAveragePlatformRating()
+  location: variable reviewRepository of type com.example.marketplace.repository.ReviewRepository
+[ERROR] /C:/Users/kumaw/OneDrive/Desktop/major project/smart-service-marketplace/src/main/java/com/example/marketplace/entity/Payment.java:[29,49] cannot find symbol
+  symbol:   variable PENDING
+  location: class com.example.marketplace.entity.PaymentStatus
+[ERROR] /C:/Users/kumaw/OneDrive/Desktop/major project/smart-service-marketplace/src/main/java/com/example/marketplace/entity/Payment.java:[50,62] cannot find symbol
+  symbol:   variable PENDING
+  location: class com.example.marketplace.entity.PaymentStatus
+[ERROR] /C:/Users/kumaw/OneDrive/Desktop/major project/smart-service-marketplace/src/main/java/com/example/marketplace/entity/Payment.java:[65,53] cannot find symbol
+  symbol:   variable PENDING
+  location: class com.example.marketplace.entity.PaymentStatus
+[INFO] 7 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  3.305 s
+[INFO] Finished at: 2026-08-11T10:43:10+05:30
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.13.0:compile (default-compile) on project smart-service-marketplace: Compilation failure: Compilation failure: 
+[ERROR] /C:/Users/kumaw/OneDrive/Desktop/major project/smart-service-marketplace/src/main/java/com/example/marketplace/service/AdminService.java:[34,45] cannot find symbol
+[ERROR]   symbol:   method countByRole(com.example.marketplace.entity.RoleType)
+[ERROR]   location: variable userRepository of type com.example.marketplace.repository.UserRepository
+[ERROR] /C:/Users/kumaw/OneDrive/Desktop/major project/smart-service-marketplace/src/main/java/com/example/marketplace/service/AdminService.java:[35,45] cannot find symbol
+[ERROR]   symbol:   method countByRole(com.example.marketplace.entity.RoleType)
+[ERROR]   location: variable userRepository of type com.example.marketplace.repository.UserRepository
+[ERROR] /C:/Users/kumaw/OneDrive/Desktop/major project/smart-service-marketplace/src/main/java/com/example/marketplace/service/AdminService.java:[43,52] cannot find symbol
+[ERROR]   symbol:   method calculateTotalPlatformRevenue()
+[ERROR]   location: variable paymentRepository of type com.example.marketplace.repository.PaymentRepository
+[ERROR] /C:/Users/kumaw/OneDrive/Desktop/major project/smart-service-marketplace/src/main/java/com/example/marketplace/service/AdminService.java:[48,44] cannot find symbol
+[ERROR]   symbol:   method findAveragePlatformRating()
+[ERROR]   location: variable reviewRepository of type com.example.marketplace.repository.ReviewRepository
+[ERROR] /C:/Users/kumaw/OneDrive/Desktop/major project/smart-service-marketplace/src/main/java/com/example/marketplace/entity/Payment.java:[29,49] cannot find symbol
+[ERROR]   symbol:   variable PENDING
+[ERROR]   location: class com.example.marketplace.entity.PaymentStatus
+[ERROR] /C:/Users/kumaw/OneDrive/Desktop/major project/smart-service-marketplace/src/main/java/com/example/marketplace/entity/Payment.java:[50,62] cannot find symbol
+[ERROR]   symbol:   variable PENDING
+[ERROR]   location: class com.example.marketplace.entity.PaymentStatus
+[ERROR] /C:/Users/kumaw/OneDrive/Desktop/major project/smart-service-marketplace/src/main/java/com/example/marketplace/entity/Payment.java:[65,53] cannot find symbol
+[ERROR]   symbol:   variable PENDING
+[ERROR]   location: class com.example.marketplace.entity.PaymentStatus
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

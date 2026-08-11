@@ -1,0 +1,20 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------------< com.example:smart-service-marketplace >----------------
+[INFO] Building Smart Service Marketplace 1.0.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ smart-service-marketplace ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] Copying 4 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ smart-service-marketplace ---
+[INFO] Recompiling the module because of added or removed source files.
+[INFO] Compiling 55 source files with javac [debug parameters release 17] to target\classes
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  3.589 s
+[INFO] Finished at: 2026-08-11T10:52:46+05:30
+[INFO] ------------------------------------------------------------------------
