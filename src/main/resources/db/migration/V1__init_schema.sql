@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS service_listings (
 CREATE TABLE IF NOT EXISTS service_tags (
     service_id BIGINT      NOT NULL,
     tag        VARCHAR(50) NOT NULL,
+    PRIMARY KEY (service_id, tag),
     CONSTRAINT fk_st_service FOREIGN KEY (service_id) REFERENCES service_listings(id) ON DELETE CASCADE
 );
 
