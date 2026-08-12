@@ -9,28 +9,40 @@ public class PaymentResponse {
 
     private Long id;
     private Long bookingId;
+    private String customerName;
     private BigDecimal amount;
     private String currency;
     private PaymentStatus status;
     private String upiReferenceId;
     private Instant confirmedAt;
     private Long confirmedByAdminId;
+    private boolean autoConfirmed;
+    private Instant reversedAt;
+    private Long reversedByAdminId;
+    private String reversalReason;
     private String notes;
     private Instant createdAt;
 
     public PaymentResponse() {
     }
 
-    public PaymentResponse(Long id, Long bookingId, BigDecimal amount, String currency, PaymentStatus status,
-            String upiReferenceId, Instant confirmedAt, Long confirmedByAdminId, String notes, Instant createdAt) {
+    public PaymentResponse(Long id, Long bookingId, String customerName, BigDecimal amount, String currency,
+            PaymentStatus status, String upiReferenceId, Instant confirmedAt, Long confirmedByAdminId,
+            boolean autoConfirmed, Instant reversedAt, Long reversedByAdminId, String reversalReason, String notes,
+            Instant createdAt) {
         this.id = id;
         this.bookingId = bookingId;
+        this.customerName = customerName;
         this.amount = amount;
         this.currency = currency;
         this.status = status;
         this.upiReferenceId = upiReferenceId;
         this.confirmedAt = confirmedAt;
         this.confirmedByAdminId = confirmedByAdminId;
+        this.autoConfirmed = autoConfirmed;
+        this.reversedAt = reversedAt;
+        this.reversedByAdminId = reversedByAdminId;
+        this.reversalReason = reversalReason;
         this.notes = notes;
         this.createdAt = createdAt;
     }
@@ -42,12 +54,17 @@ public class PaymentResponse {
     public static class Builder {
         private Long id;
         private Long bookingId;
+        private String customerName;
         private BigDecimal amount;
         private String currency;
         private PaymentStatus status;
         private String upiReferenceId;
         private Instant confirmedAt;
         private Long confirmedByAdminId;
+        private boolean autoConfirmed = true;
+        private Instant reversedAt;
+        private Long reversedByAdminId;
+        private String reversalReason;
         private String notes;
         private Instant createdAt;
 
@@ -58,6 +75,11 @@ public class PaymentResponse {
 
         public Builder bookingId(Long bookingId) {
             this.bookingId = bookingId;
+            return this;
+        }
+
+        public Builder customerName(String customerName) {
+            this.customerName = customerName;
             return this;
         }
 
@@ -91,6 +113,26 @@ public class PaymentResponse {
             return this;
         }
 
+        public Builder autoConfirmed(boolean autoConfirmed) {
+            this.autoConfirmed = autoConfirmed;
+            return this;
+        }
+
+        public Builder reversedAt(Instant reversedAt) {
+            this.reversedAt = reversedAt;
+            return this;
+        }
+
+        public Builder reversedByAdminId(Long reversedByAdminId) {
+            this.reversedByAdminId = reversedByAdminId;
+            return this;
+        }
+
+        public Builder reversalReason(String reversalReason) {
+            this.reversalReason = reversalReason;
+            return this;
+        }
+
         public Builder notes(String notes) {
             this.notes = notes;
             return this;
@@ -102,8 +144,9 @@ public class PaymentResponse {
         }
 
         public PaymentResponse build() {
-            return new PaymentResponse(id, bookingId, amount, currency, status, upiReferenceId, confirmedAt,
-                    confirmedByAdminId, notes, createdAt);
+            return new PaymentResponse(id, bookingId, customerName, amount, currency, status, upiReferenceId,
+                    confirmedAt, confirmedByAdminId, autoConfirmed, reversedAt, reversedByAdminId, reversalReason,
+                    notes, createdAt);
         }
     }
 
@@ -121,6 +164,14 @@ public class PaymentResponse {
 
     public void setBookingId(Long bookingId) {
         this.bookingId = bookingId;
+    }
+
+    public String getCustomerName() {
+        return customerName;
+    }
+
+    public void setCustomerName(String customerName) {
+        this.customerName = customerName;
     }
 
     public BigDecimal getAmount() {
@@ -169,6 +220,38 @@ public class PaymentResponse {
 
     public void setConfirmedByAdminId(Long confirmedByAdminId) {
         this.confirmedByAdminId = confirmedByAdminId;
+    }
+
+    public boolean isAutoConfirmed() {
+        return autoConfirmed;
+    }
+
+    public void setAutoConfirmed(boolean autoConfirmed) {
+        this.autoConfirmed = autoConfirmed;
+    }
+
+    public Instant getReversedAt() {
+        return reversedAt;
+    }
+
+    public void setReversedAt(Instant reversedAt) {
+        this.reversedAt = reversedAt;
+    }
+
+    public Long getReversedByAdminId() {
+        return reversedByAdminId;
+    }
+
+    public void setReversedByAdminId(Long reversedByAdminId) {
+        this.reversedByAdminId = reversedByAdminId;
+    }
+
+    public String getReversalReason() {
+        return reversalReason;
+    }
+
+    public void setReversalReason(String reversalReason) {
+        this.reversalReason = reversalReason;
     }
 
     public String getNotes() {

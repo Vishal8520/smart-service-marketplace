@@ -88,12 +88,12 @@ public class AdminController {
         return ResponseEntity.ok(adminService.toggleServiceActive(id));
     }
 
-    // --- Payment Verification ---
+    // --- Payment Verification & Audit ---
 
     @GetMapping("/payments")
-    @Operation(summary = "List payment references filtered by status (e.g. PENDING)")
-    public ResponseEntity<Page<PaymentResponse>> getPaymentsByStatus(
-            @RequestParam(defaultValue = "PENDING") PaymentStatus status,
+    @Operation(summary = "List all payment records with optional status filter")
+    public ResponseEntity<Page<PaymentResponse>> getPayments(
+            @RequestParam(required = false) PaymentStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -110,6 +110,18 @@ public class AdminController {
                 ? authentication.getName()
                 : "vishalghasoliya22@gmail.com";
         return ResponseEntity.ok(adminService.confirmPayment(id, request, adminEmail));
+    }
+
+    @PostMapping("/payments/{id}/reverse")
+    @Operation(summary = "Reverse an auto-confirmed or confirmed payment with reason note")
+    public ResponseEntity<PaymentResponse> reversePayment(
+            @PathVariable Long id,
+            @Valid @RequestBody PaymentRejectRequest request,
+            Authentication authentication) {
+        String adminEmail = (authentication != null && authentication.getName() != null)
+                ? authentication.getName()
+                : "vishalghasoliya22@gmail.com";
+        return ResponseEntity.ok(adminService.reversePayment(id, request, adminEmail));
     }
 
     @PostMapping("/payments/{id}/reject")

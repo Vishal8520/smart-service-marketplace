@@ -860,28 +860,31 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Step 2: Enter 12-Digit UPI Transaction Reference ID / UTR *</label>
-          <input class="form-control" id="upi_ref_input" placeholder="e.g. 421987654321 or UPI-REF-998877" required>
-          <div class="form-hint">Enter the transaction reference number from your GPay/PhonePe receipt</div>
+          <label class="form-label">Step 2: Enter UPI ID / Reference ID *</label>
+          <input class="form-control" id="upi_ref_input" placeholder="Do not fill your correct UPI ID here for yet."
+            oninput="validateUpiRefInline()" required>
+          <div id="upi_ref_feedback" style="font-size:.8rem;margin-top:.25rem;font-weight:600"></div>
+          <div class="form-hint">Format example: user@upi or 12-digit UTR reference string</div>
         </div>
 
         <div style="display:flex;gap:.75rem;margin-top:1rem">
           <button class="btn btn-outline" onclick="goStep(2)">← Back</button>
-          <button class="btn btn-success" id="paySubmitBtn" onclick="submitUpiPaymentReference()">✓ Submit Payment
-            Reference</button>
+          <button class="btn btn-success" id="paySubmitBtn" onclick="submitUpiPaymentReference()">✓ Submit & Confirm
+            Payment</button>
         </div>
       </div>
 
-      <!-- Step 4 – Confirmation -->
+      <!-- Step 4 – Instant Confirmation Success View -->
       <div id="step4" style="display:none">
         <div
           style="text-align:center;background:#fff;border:1px solid var(--gray-300);border-radius:8px;padding:2.5rem 1.5rem;max-width:600px;margin:0 auto">
-          <div style="font-size:4rem;margin-bottom:.75rem">📩</div>
-          <h2 style="color:var(--link);margin-bottom:.5rem">Payment Reference Submitted!</h2>
-          <p style="color:var(--gray-600);margin-bottom:1.25rem">Our admin team is reviewing your UPI reference. Once
-            verified, provider contact info will be unlocked and sent to your email.</p>
+          <div style="font-size:4rem;margin-bottom:.75rem">✅</div>
+          <h2 style="color:var(--link);margin-bottom:.5rem">Booking & Payment Confirmed!</h2>
+          <p style="color:var(--gray-600);margin-bottom:1.25rem">Your payment reference has been auto-approved (Demo
+            Mode). Your booking is now active and provider details are unlocked.</p>
           <div class="order-summary" id="confirmSummary"></div>
-          <button class="btn btn-amber" onclick="showView('bookings');loadMyBookings()">Check Booking Status</button>
+          <button class="btn btn-amber" onclick="showView('bookings');fetchMyBookings()">View My Bookings
+            Tracker</button>
         </div>
       </div>
     </div>
@@ -1239,6 +1242,36 @@
         const s = document.getElementById('s' + i);
         if (s) { s.classList.remove('active', 'done'); if (i < n) s.classList.add('done'); else if (i === n) s.classList.add('active'); }
       });
+      if (n === 3) {
+        setTimeout(() => {
+          const input = document.getElementById('upi_ref_input');
+          if (input) { input.focus(); validateUpiRefInline(); }
+        }, 100);
+      }
+    }
+
+    let upiValTimer = null;
+    function validateUpiRefInline() {
+      clearTimeout(upiValTimer);
+      upiValTimer = setTimeout(() => {
+        const input = document.getElementById('upi_ref_input');
+        const feedback = document.getElementById('upi_ref_feedback');
+        if (!input || !feedback) return;
+        const val = input.value.trim();
+        if (!val) {
+          feedback.textContent = '';
+          return;
+        }
+        const upiRegex = /^[\w.\-]{2,49}@[a-zA-Z]{2,49}$/;
+        const utrRegex = /^\d{12}$/;
+        if (upiRegex.test(val) || utrRegex.test(val)) {
+          feedback.style.color = '#137333';
+          feedback.textContent = '✓ Valid UPI ID / UTR reference format';
+        } else {
+          feedback.style.color = '#c5221f';
+          feedback.textContent = '✕ Enter a valid UPI ID (e.g. user@upi) or 12-digit UTR string';
+        }
+      }, 200);
     }
 
     async function submitBookingAndProceedToPay() {
@@ -1274,10 +1307,10 @@
 
     async function submitUpiPaymentReference() {
       const ref = document.getElementById('upi_ref_input').value.trim();
-      if (!ref || ref.length < 6) { toast('Please enter a valid 12-digit UPI Transaction Reference string', true); return; }
+      if (!ref || ref.length < 3) { toast('Please enter a valid UPI ID or reference string', true); return; }
 
       const btn = document.getElementById('paySubmitBtn');
-      btn.disabled = true; btn.textContent = 'Submitting...';
+      btn.disabled = true; btn.textContent = '⏳ Processing Payment...';
 
       try {
         const r = await fetch('/api/payments', {
@@ -1287,11 +1320,18 @@
         });
         if (!r.ok) { const data = await r.json(); throw new Error(data.message || 'Payment submission failed'); }
 
+        const paymentRes = await r.json();
+        document.getElementById('confirmSummary').innerHTML = `
+          <div class="order-row"><span>Booking ID</span><span>#${createdBooking.id}</span></div>
+          <div class="order-row"><span>Payment Status</span><span style="color:#137333;font-weight:700">AUTO-CONFIRMED (Demo)</span></div>
+          <div class="order-row"><span>UPI Reference</span><span>${esc(paymentRes.upiReferenceId || ref)}</span></div>
+        `;
+
         goStep(4);
-        toast('Payment reference submitted successfully!');
+        toast('🎉 Booking & Payment Confirmed!');
       } catch (err) {
         toast(err.message, true);
-        btn.disabled = false; btn.textContent = '✓ Submit Payment Reference';
+        btn.disabled = false; btn.textContent = '✓ Submit & Confirm Payment';
       }
     }
 
@@ -1496,82 +1536,64 @@
       loadAdminPendingServices();
     }
 
-    // ── ONE-CLICK UPI VERIFICATION ──
+    // ── ADMIN PAYMENT AUDIT & REVERSAL ──
     async function loadAdminPendingPayments() {
       const tbody = document.getElementById('admin-payments-body');
       try {
-        const r = await fetch('/api/admin/payments?status=PENDING', {
+        const r = await fetch('/api/admin/payments', {
           headers: { 'Authorization': 'Bearer ' + adminJwt }
         });
         const data = await r.json();
         const rows = data.content || [];
         if (!rows.length) {
-          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:1.5rem">No pending payment references to confirm</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:1.5rem">No payment audit records found</td></tr>`;
           return;
         }
-        tbody.innerHTML = rows.map(p => `<tr id="pay-row-${p.id}">
-          <td>#${p.id}</td>
-          <td>#${p.bookingId}</td>
-          <td>₹${p.amount}</td>
-          <td><code title="Unverified reference string">${p.upiReferenceId}</code></td>
-          <td>${new Date(p.createdAt).toLocaleString()}</td>
-          <td style="display:flex;gap:.4rem;align-items:center">
-            <button class="btn btn-success btn-sm" id="btn-conf-${p.id}" onclick="oneClickConfirmPayment(${p.id})">✓ One-Click Confirm</button>
-            <select class="form-control" style="width:130px;padding:.2rem .4rem;font-size:.75rem" onchange="oneClickRejectPayment(${p.id}, this.value)">
-              <option value="">Quick Reject…</option>
-              <option value="UPI ref not found">Ref Not Found</option>
-              <option value="Amount mismatch">Amount Mismatch</option>
-              <option value="Duplicate reference">Duplicate Ref</option>
-              <option value="OTHER">Other Reason…</option>
-            </select>
-          </td>
-        </tr>`).join('');
+        tbody.innerHTML = rows.map(p => {
+          const isReversed = p.status === 'REVERSED' || p.status === 'REJECTED';
+          const badgeClass = isReversed ? 'badge-cancelled' : 'badge-confirmed';
+          const autoBadge = p.autoConfirmed ? '<span style="font-size:.65rem;background:#e8f0fe;color:#1a73e8;padding:1px 4px;border-radius:3px;margin-left:4px">AUTO</span>' : '';
+
+          return `<tr id="pay-row-${p.id}">
+            <td>#${p.id}</td>
+            <td>#${p.bookingId}</td>
+            <td><strong>${esc(p.customerName || 'Customer')}</strong></td>
+            <td>₹${p.amount}</td>
+            <td><code>${esc(p.upiReferenceId || 'N/A')}</code><br><small style="color:var(--gray-500)">Self-reported (unverified)</small></td>
+            <td><span class="badge ${badgeClass}">${p.status}</span>${autoBadge}</td>
+            <td>${new Date(p.createdAt).toLocaleString()}</td>
+            <td style="display:flex;gap:.4rem;align-items:center">
+              ${!isReversed ? `
+                <select class="form-control" style="width:140px;padding:.2rem .4rem;font-size:.75rem" onchange="oneClickReversePayment(${p.id}, this.value)">
+                  <option value="">Reverse Payment…</option>
+                  <option value="UPI ref not found">Ref Not Found</option>
+                  <option value="Amount mismatch">Amount Mismatch</option>
+                  <option value="Duplicate reference">Duplicate Ref</option>
+                  <option value="OTHER">Custom Reason…</option>
+                </select>
+              ` : `<small style="color:var(--gray-500)">Reversed: ${esc(p.reversalReason || 'Audit Action')}</small>`}
+            </td>
+          </tr>`;
+        }).join('');
       } catch (e) { }
     }
 
-    async function oneClickConfirmPayment(id) {
-      const btn = document.getElementById(`btn-conf-${id}`);
-      if (btn) { btn.disabled = true; btn.textContent = '⏳ Confirming...'; }
-
-      try {
-        const r = await fetch(`/api/admin/payments/${id}/confirm`, {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + adminJwt, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ notes: 'Verified by Admin via one-click confirm' })
-        });
-        if (!r.ok) throw new Error('Confirmation failed');
-        toast(`Payment #${id} confirmed! Email notifications fired.`);
-        const row = document.getElementById(`pay-row-${id}`);
-        if (row) row.remove();
-        if (!document.querySelectorAll('#admin-payments-body tr').length) {
-          loadAdminPendingPayments();
-        }
-      } catch (err) {
-        toast(err.message, true);
-        if (btn) { btn.disabled = false; btn.textContent = '✓ One-Click Confirm'; }
-      }
-    }
-
-    async function oneClickRejectPayment(id, chosenReason) {
+    async function oneClickReversePayment(id, chosenReason) {
       if (!chosenReason) return;
       let reason = chosenReason;
       if (chosenReason === 'OTHER') {
-        reason = prompt('Enter custom rejection reason:') || 'Unverified reference';
+        reason = prompt('Enter payment reversal audit reason:') || 'Reversed by admin audit';
       }
 
       try {
-        const r = await fetch(`/api/admin/payments/${id}/reject`, {
+        const r = await fetch(`/api/admin/payments/${id}/reverse`, {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + adminJwt, 'Content-Type': 'application/json' },
           body: JSON.stringify({ notes: reason })
         });
-        if (!r.ok) throw new Error('Rejection failed');
-        toast(`Payment #${id} rejected (${reason}).`);
-        const row = document.getElementById(`pay-row-${id}`);
-        if (row) row.remove();
-        if (!document.querySelectorAll('#admin-payments-body tr').length) {
-          loadAdminPendingPayments();
-        }
+        if (!r.ok) throw new Error('Reversal failed');
+        toast(`Payment #${id} reversed (${reason}). Customer notified.`);
+        loadAdminPendingPayments();
       } catch (err) { toast(err.message, true); }
     }
 

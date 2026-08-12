@@ -3,5 +3,7 @@ package com.example.marketplace.entity;
 public enum PaymentStatus {
     PENDING,
     CONFIRMED,
-    REJECTED
+    AUTO_CONFIRMED,
+    REJECTED,
+    REVERSED
 }

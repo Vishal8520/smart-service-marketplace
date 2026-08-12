@@ -26,7 +26,7 @@ public class Payment {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20, columnDefinition = "VARCHAR(20)")
-    private PaymentStatus status = PaymentStatus.PENDING;
+    private PaymentStatus status = PaymentStatus.AUTO_CONFIRMED;
 
     @Column(name = "upi_reference_id", length = 150)
     private String upiReferenceId;
@@ -37,6 +37,19 @@ public class Payment {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "confirmed_by_admin_id")
     private User confirmedByAdmin;
+
+    @Column(name = "auto_confirmed", nullable = false)
+    private boolean autoConfirmed = true;
+
+    @Column(name = "reversed_at")
+    private Instant reversedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reversed_by_admin_id")
+    private User reversedByAdmin;
+
+    @Column(name = "reversal_reason", length = 500)
+    private String reversalReason;
 
     @Column(length = 500)
     private String notes;
@@ -49,15 +62,20 @@ public class Payment {
     }
 
     public Payment(Long id, Booking booking, BigDecimal amount, String currency, PaymentStatus status,
-            String upiReferenceId, Instant confirmedAt, User confirmedByAdmin, String notes, Instant createdAt) {
+            String upiReferenceId, Instant confirmedAt, User confirmedByAdmin, boolean autoConfirmed,
+            Instant reversedAt, User reversedByAdmin, String reversalReason, String notes, Instant createdAt) {
         this.id = id;
         this.booking = booking;
         this.amount = amount;
         this.currency = currency != null ? currency : "INR";
-        this.status = status != null ? status : PaymentStatus.PENDING;
+        this.status = status != null ? status : PaymentStatus.AUTO_CONFIRMED;
         this.upiReferenceId = upiReferenceId;
         this.confirmedAt = confirmedAt;
         this.confirmedByAdmin = confirmedByAdmin;
+        this.autoConfirmed = autoConfirmed;
+        this.reversedAt = reversedAt;
+        this.reversedByAdmin = reversedByAdmin;
+        this.reversalReason = reversalReason;
         this.notes = notes;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
     }
@@ -71,10 +89,14 @@ public class Payment {
         private Booking booking;
         private BigDecimal amount;
         private String currency = "INR";
-        private PaymentStatus status = PaymentStatus.PENDING;
+        private PaymentStatus status = PaymentStatus.AUTO_CONFIRMED;
         private String upiReferenceId;
         private Instant confirmedAt;
         private User confirmedByAdmin;
+        private boolean autoConfirmed = true;
+        private Instant reversedAt;
+        private User reversedByAdmin;
+        private String reversalReason;
         private String notes;
         private Instant createdAt;
 
@@ -118,6 +140,26 @@ public class Payment {
             return this;
         }
 
+        public Builder autoConfirmed(boolean autoConfirmed) {
+            this.autoConfirmed = autoConfirmed;
+            return this;
+        }
+
+        public Builder reversedAt(Instant reversedAt) {
+            this.reversedAt = reversedAt;
+            return this;
+        }
+
+        public Builder reversedByAdmin(User reversedByAdmin) {
+            this.reversedByAdmin = reversedByAdmin;
+            return this;
+        }
+
+        public Builder reversalReason(String reversalReason) {
+            this.reversalReason = reversalReason;
+            return this;
+        }
+
         public Builder notes(String notes) {
             this.notes = notes;
             return this;
@@ -130,7 +172,7 @@ public class Payment {
 
         public Payment build() {
             return new Payment(id, booking, amount, currency, status, upiReferenceId, confirmedAt, confirmedByAdmin,
-                    notes, createdAt);
+                    autoConfirmed, reversedAt, reversedByAdmin, reversalReason, notes, createdAt);
         }
     }
 
@@ -196,6 +238,38 @@ public class Payment {
 
     public void setConfirmedByAdmin(User confirmedByAdmin) {
         this.confirmedByAdmin = confirmedByAdmin;
+    }
+
+    public boolean isAutoConfirmed() {
+        return autoConfirmed;
+    }
+
+    public void setAutoConfirmed(boolean autoConfirmed) {
+        this.autoConfirmed = autoConfirmed;
+    }
+
+    public Instant getReversedAt() {
+        return reversedAt;
+    }
+
+    public void setReversedAt(Instant reversedAt) {
+        this.reversedAt = reversedAt;
+    }
+
+    public User getReversedByAdmin() {
+        return reversedByAdmin;
+    }
+
+    public void setReversedByAdmin(User reversedByAdmin) {
+        this.reversedByAdmin = reversedByAdmin;
+    }
+
+    public String getReversalReason() {
+        return reversalReason;
+    }
+
+    public void setReversalReason(String reversalReason) {
+        this.reversalReason = reversalReason;
     }
 
     public String getNotes() {

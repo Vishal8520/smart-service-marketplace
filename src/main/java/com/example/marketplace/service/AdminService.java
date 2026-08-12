@@ -117,6 +117,11 @@ public class AdminService {
     }
 
     @Transactional
+    public PaymentResponse reversePayment(Long paymentId, PaymentRejectRequest request, String adminEmail) {
+        return paymentService.reversePayment(paymentId, request, adminEmail);
+    }
+
+    @Transactional
     public PaymentResponse rejectPayment(Long paymentId, PaymentRejectRequest request) {
         return paymentService.rejectPayment(paymentId, request);
     }
