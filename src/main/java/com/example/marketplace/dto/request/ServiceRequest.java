@@ -21,6 +21,8 @@ public class ServiceRequest {
     @NotNull(message = "Category is required")
     private Long categoryId;
 
+    private Long cityId;
+
     @NotNull(message = "Price is required")
     @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
     private BigDecimal price;
@@ -54,6 +56,14 @@ public class ServiceRequest {
 
     public void setCategoryId(Long categoryId) {
         this.categoryId = categoryId;
+    }
+
+    public Long getCityId() {
+        return cityId;
+    }
+
+    public void setCityId(Long cityId) {
+        this.cityId = cityId;
     }
 
     public BigDecimal getPrice() {

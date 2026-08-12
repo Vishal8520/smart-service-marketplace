@@ -1,5 +1,7 @@
 package com.example.marketplace.dto.response;
 
+import com.example.marketplace.entity.ServiceStatus;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -15,6 +17,9 @@ public class ServiceResponse {
     private Long providerId;
     private String providerName;
     private String providerEmail;
+    private Long cityId;
+    private String cityName;
+    private ServiceStatus status;
     private List<String> tags;
     private Double averageRating;
     private boolean active;
@@ -24,7 +29,8 @@ public class ServiceResponse {
     }
 
     public ServiceResponse(Long id, String title, String description, BigDecimal price, Long categoryId,
-            String categoryName, Long providerId, String providerName, String providerEmail, List<String> tags,
+            String categoryName, Long providerId, String providerName, String providerEmail,
+            Long cityId, String cityName, ServiceStatus status, List<String> tags,
             Double averageRating, boolean active, Instant createdAt) {
         this.id = id;
         this.title = title;
@@ -35,6 +41,9 @@ public class ServiceResponse {
         this.providerId = providerId;
         this.providerName = providerName;
         this.providerEmail = providerEmail;
+        this.cityId = cityId;
+        this.cityName = cityName;
+        this.status = status;
         this.tags = tags;
         this.averageRating = averageRating;
         this.active = active;
@@ -55,6 +64,9 @@ public class ServiceResponse {
         private Long providerId;
         private String providerName;
         private String providerEmail;
+        private Long cityId;
+        private String cityName;
+        private ServiceStatus status;
         private List<String> tags;
         private Double averageRating;
         private boolean active;
@@ -105,6 +117,21 @@ public class ServiceResponse {
             return this;
         }
 
+        public Builder cityId(Long cityId) {
+            this.cityId = cityId;
+            return this;
+        }
+
+        public Builder cityName(String cityName) {
+            this.cityName = cityName;
+            return this;
+        }
+
+        public Builder status(ServiceStatus status) {
+            this.status = status;
+            return this;
+        }
+
         public Builder tags(List<String> tags) {
             this.tags = tags;
             return this;
@@ -127,7 +154,7 @@ public class ServiceResponse {
 
         public ServiceResponse build() {
             return new ServiceResponse(id, title, description, price, categoryId, categoryName, providerId,
-                    providerName, providerEmail, tags, averageRating, active, createdAt);
+                    providerName, providerEmail, cityId, cityName, status, tags, averageRating, active, createdAt);
         }
     }
 
@@ -201,6 +228,30 @@ public class ServiceResponse {
 
     public void setProviderEmail(String providerEmail) {
         this.providerEmail = providerEmail;
+    }
+
+    public Long getCityId() {
+        return cityId;
+    }
+
+    public void setCityId(Long cityId) {
+        this.cityId = cityId;
+    }
+
+    public String getCityName() {
+        return cityName;
+    }
+
+    public void setCityName(String cityName) {
+        this.cityName = cityName;
+    }
+
+    public ServiceStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(ServiceStatus status) {
+        this.status = status;
     }
 
     public List<String> getTags() {

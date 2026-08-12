@@ -36,44 +36,26 @@ public class SecurityConfig {
         this.corsConfigurationSource = corsConfigurationSource;
     }
 
-    // TEMP: auth disabled for local demo — permit all requests, no JWT filter.
-    // To re-enable: swap this bean with the original filterChain below.
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/", "/index.html", "/favicon.ico", "/css/**", "/js/**", "/images/**")
+                        .permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/services/**", "/api/categories/**", "/api/cities/**")
+                        .permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/payments/**").authenticated()
+                        .anyRequest().permitAll())
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
-
-    // ORIGINAL filterChain (production) — uncomment and replace above to re-enable
-    // auth:
-    /*
-     * @Bean
-     * public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-     * return http
-     * .csrf(AbstractHttpConfigurer::disable)
-     * .cors(cors -> cors.configurationSource(corsConfigurationSource))
-     * .sessionManagement(sm ->
-     * sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-     * .authorizeHttpRequests(auth -> auth
-     * .requestMatchers("/", "/index.html", "/static/**", "/css/**", "/js/**",
-     * "/favicon.ico",
-     * "/error")
-     * .permitAll()
-     * .requestMatchers("/api/auth/**").permitAll()
-     * .requestMatchers(HttpMethod.GET, "/api/services/**").permitAll()
-     * .requestMatchers("/swagger-ui/**", "/api-docs/**",
-     * "/swagger-ui.html").permitAll()
-     * .requestMatchers("/actuator/health").permitAll()
-     * .anyRequest().authenticated())
-     * .authenticationProvider(authenticationProvider())
-     * .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-     * .build();
-     * }
-     */
 
     @Bean
     public AuthenticationProvider authenticationProvider() {

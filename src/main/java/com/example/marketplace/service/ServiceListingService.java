@@ -2,11 +2,9 @@ package com.example.marketplace.service;
 
 import com.example.marketplace.dto.request.ServiceRequest;
 import com.example.marketplace.dto.response.ServiceResponse;
-import com.example.marketplace.entity.Category;
-import com.example.marketplace.entity.RoleType;
-import com.example.marketplace.entity.ServiceListing;
-import com.example.marketplace.entity.User;
+import com.example.marketplace.entity.*;
 import com.example.marketplace.exception.ResourceNotFoundException;
+import com.example.marketplace.repository.CityRepository;
 import com.example.marketplace.repository.ReviewRepository;
 import com.example.marketplace.repository.ServiceListingRepository;
 import com.example.marketplace.repository.UserRepository;
@@ -21,22 +19,30 @@ public class ServiceListingService {
     private final ServiceListingRepository serviceRepo;
     private final UserRepository userRepo;
     private final ReviewRepository reviewRepo;
+    private final CityRepository cityRepo;
 
     public ServiceListingService(ServiceListingRepository serviceRepo, UserRepository userRepo,
-            ReviewRepository reviewRepo) {
+            ReviewRepository reviewRepo, CityRepository cityRepo) {
         this.serviceRepo = serviceRepo;
         this.userRepo = userRepo;
         this.reviewRepo = reviewRepo;
+        this.cityRepo = cityRepo;
     }
 
-    public Page<ServiceResponse> searchServices(String keyword, Long categoryId, String tag, Pageable pageable) {
+    public Page<ServiceResponse> searchServices(String keyword, Long categoryId, Long cityId, String tag,
+            Pageable pageable) {
         Page<ServiceListing> page;
         if (keyword != null && !keyword.isBlank()) {
-            page = serviceRepo.search(keyword, categoryId, tag, pageable);
+            page = serviceRepo.searchActiveAndApprovedServices(keyword, ServiceStatus.APPROVED, pageable);
+        } else if (cityId != null && categoryId != null) {
+            page = serviceRepo.findByCityIdAndCategoryIdAndActiveTrueAndStatus(cityId, categoryId,
+                    ServiceStatus.APPROVED, pageable);
+        } else if (cityId != null) {
+            page = serviceRepo.findByCityIdAndActiveTrueAndStatus(cityId, ServiceStatus.APPROVED, pageable);
         } else if (categoryId != null) {
-            page = serviceRepo.findByCategoryIdAndActiveTrue(categoryId, pageable);
+            page = serviceRepo.findByCategoryIdAndActiveTrueAndStatus(categoryId, ServiceStatus.APPROVED, pageable);
         } else {
-            page = serviceRepo.findByActiveTrue(pageable);
+            page = serviceRepo.findByActiveTrueAndStatus(ServiceStatus.APPROVED, pageable);
         }
         return page.map(this::toResponse);
     }
@@ -64,13 +70,25 @@ public class ServiceListingService {
         Category category = new Category();
         category.setId(request.getCategoryId());
 
+        City city = null;
+        if (request.getCityId() != null) {
+            city = cityRepo.findById(request.getCityId()).orElse(null);
+        }
+
+        // New listings default to PENDING_REVIEW unless created by admin
+        ServiceStatus initialStatus = (provider.getRole() == RoleType.ADMIN) ? ServiceStatus.APPROVED
+                : ServiceStatus.PENDING_REVIEW;
+
         ServiceListing listing = ServiceListing.builder()
                 .provider(provider)
                 .category(category)
+                .city(city)
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .tags(request.getTags())
                 .price(request.getPrice())
+                .status(initialStatus)
+                .active(initialStatus == ServiceStatus.APPROVED)
                 .build();
 
         return toResponse(serviceRepo.save(listing));
@@ -82,6 +100,11 @@ public class ServiceListingService {
 
         Category category = new Category();
         category.setId(request.getCategoryId());
+
+        if (request.getCityId() != null) {
+            City city = cityRepo.findById(request.getCityId()).orElse(null);
+            listing.setCity(city);
+        }
 
         listing.setCategory(category);
         listing.setTitle(request.getTitle());
@@ -117,6 +140,9 @@ public class ServiceListingService {
                 .providerEmail(null) // SERVER-SIDE CONTACT HIDING: Do NOT expose email/phone during service browsing
                 .categoryId(s.getCategory() != null ? s.getCategory().getId() : null)
                 .categoryName(s.getCategory() != null ? s.getCategory().getName() : null)
+                .cityId(s.getCity() != null ? s.getCity().getId() : null)
+                .cityName(s.getCity() != null ? s.getCity().getName() : "All Cities")
+                .status(s.getStatus())
                 .title(s.getTitle())
                 .description(s.getDescription())
                 .tags(s.getTags())

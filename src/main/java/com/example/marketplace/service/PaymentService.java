@@ -1,146 +1,165 @@
 package com.example.marketplace.service;
 
-import com.example.marketplace.dto.request.PaymentOrderRequest;
+import com.example.marketplace.dto.request.PaymentConfirmRequest;
+import com.example.marketplace.dto.request.PaymentRejectRequest;
+import com.example.marketplace.dto.request.PaymentRequest;
 import com.example.marketplace.dto.response.PaymentResponse;
-import com.example.marketplace.entity.Booking;
-import com.example.marketplace.entity.Payment;
-import com.example.marketplace.entity.PaymentStatus;
-import com.example.marketplace.entity.User;
-import com.example.marketplace.exception.ResourceNotFoundException;
-import com.example.marketplace.exception.UnauthorizedException;
+import com.example.marketplace.entity.*;
+import com.example.marketplace.port.PaymentGatewayPort;
 import com.example.marketplace.repository.BookingRepository;
 import com.example.marketplace.repository.PaymentRepository;
 import com.example.marketplace.repository.UserRepository;
-import com.razorpay.Order;
-import com.razorpay.RazorpayClient;
-import com.razorpay.RazorpayException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.util.HexFormat;
-import java.util.Map;
+import java.time.Instant;
+import java.util.Optional;
 
 @Service
 public class PaymentService {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
 
-    private final PaymentRepository paymentRepo;
-    private final BookingRepository bookingRepo;
-    private final UserRepository userRepo;
+    private final PaymentRepository paymentRepository;
+    private final BookingRepository bookingRepository;
+    private final UserRepository userRepository;
+    private final EmailService emailService;
+    private final PaymentGatewayPort paymentGatewayPort;
 
-    @Value("${razorpay.key-id}")
-    private String razorpayKeyId;
-
-    @Value("${razorpay.key-secret}")
-    private String razorpayKeySecret;
-
-    public PaymentService(PaymentRepository paymentRepo, BookingRepository bookingRepo, UserRepository userRepo) {
-        this.paymentRepo = paymentRepo;
-        this.bookingRepo = bookingRepo;
-        this.userRepo = userRepo;
+    public PaymentService(PaymentRepository paymentRepository, BookingRepository bookingRepository,
+            UserRepository userRepository, EmailService emailService,
+            PaymentGatewayPort paymentGatewayPort) {
+        this.paymentRepository = paymentRepository;
+        this.bookingRepository = bookingRepository;
+        this.userRepository = userRepository;
+        this.emailService = emailService;
+        this.paymentGatewayPort = paymentGatewayPort;
     }
 
     @Transactional
-    public PaymentResponse createOrder(PaymentOrderRequest request, String customerEmail) {
-        User customer = getUserByEmail(customerEmail);
-        Booking booking = bookingRepo.findById(request.getBookingId())
-                .orElseThrow(() -> new ResourceNotFoundException("Booking", "id", request.getBookingId()));
+    public PaymentResponse createPaymentReference(PaymentRequest request, String currentUserEmail) {
+        Booking booking = bookingRepository.findById(request.getBookingId())
+                .orElseThrow(
+                        () -> new IllegalArgumentException("Booking not found with ID: " + request.getBookingId()));
 
-        if (!booking.getCustomer().getId().equals(customer.getId())) {
-            throw new UnauthorizedException("This booking does not belong to you");
-        }
-        if (paymentRepo.findByBookingId(booking.getId()).isPresent()) {
-            throw new IllegalStateException("Payment already exists for this booking");
+        User user = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + currentUserEmail));
+
+        // Check customer ownership (unless admin)
+        if (user.getRole() != RoleType.ADMIN && !booking.getCustomer().getId().equals(user.getId())) {
+            throw new IllegalStateException("You are not authorized to submit payment for this booking");
         }
 
-        BigDecimal amount = booking.getService().getPrice();
-        String gatewayOrderId = createRazorpayOrder(amount);
+        // Idempotency / duplicate check
+        Optional<Payment> existingPaymentOpt = paymentRepository.findByBookingId(booking.getId());
+        if (existingPaymentOpt.isPresent()) {
+            Payment existing = existingPaymentOpt.get();
+            if (existing.getStatus() == PaymentStatus.CONFIRMED) {
+                throw new IllegalStateException(
+                        "Payment for booking #" + booking.getId() + " has already been confirmed");
+            }
+            // Update existing pending/rejected reference with new reference
+            existing.setUpiReferenceId(request.getUpiReferenceId());
+            existing.setStatus(PaymentStatus.PENDING);
+            existing.setNotes(null);
+            Payment saved = paymentRepository.save(existing);
+            emailService.sendPaymentSubmittedNotification(saved);
+            return mapToResponse(saved);
+        }
+
+        // Invoke extension port stub for order tracking
+        String stubOrderId = paymentGatewayPort.createOrder(booking.getService().getPrice(), "INR",
+                "BOOKING_" + booking.getId());
+        log.info("Payment extension port returned order ID: {} for booking #{}", stubOrderId, booking.getId());
 
         Payment payment = Payment.builder()
                 .booking(booking)
-                .amount(amount)
-                .gatewayOrderId(gatewayOrderId)
+                .amount(booking.getService().getPrice())
+                .currency("INR")
+                .status(PaymentStatus.PENDING)
+                .upiReferenceId(request.getUpiReferenceId())
+                .createdAt(Instant.now())
                 .build();
 
-        return toResponse(paymentRepo.save(payment));
+        Payment saved = paymentRepository.save(payment);
+        emailService.sendPaymentSubmittedNotification(saved);
+        return mapToResponse(saved);
     }
 
     @Transactional
-    public void handleWebhook(Map<String, String> params) {
-        String razorpayOrderId = params.get("razorpay_order_id");
-        String razorpayPaymentId = params.get("razorpay_payment_id");
-        String razorpaySignature = params.get("razorpay_signature");
+    public PaymentResponse confirmPayment(Long paymentId, PaymentConfirmRequest request, String adminEmail) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("Payment not found with ID: " + paymentId));
 
-        Payment payment = paymentRepo.findByGatewayOrderId(razorpayOrderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Payment", "orderId", razorpayOrderId));
+        User admin = userRepository.findByEmail(adminEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Admin user not found: " + adminEmail));
 
-        boolean signatureValid = verifySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+        payment.setStatus(PaymentStatus.CONFIRMED);
+        payment.setConfirmedAt(Instant.now());
+        payment.setConfirmedByAdmin(admin);
+        payment.setNotes(request != null && request.getNotes() != null ? request.getNotes()
+                : "Payment verified via manual UPI reference");
 
-        if (signatureValid) {
-            payment.setGatewayPaymentId(razorpayPaymentId);
-            payment.setStatus(PaymentStatus.SUCCESS);
-        } else {
-            payment.setStatus(PaymentStatus.FAILED);
-        }
+        // Transition booking to CONFIRMED
+        Booking booking = payment.getBooking();
+        booking.setStatus(BookingStatus.CONFIRMED);
+        bookingRepository.save(booking);
 
-        paymentRepo.save(payment);
+        Payment saved = paymentRepository.save(payment);
+        emailService.sendPaymentConfirmedNotification(saved);
+        return mapToResponse(saved);
     }
 
-    private String createRazorpayOrder(BigDecimal amount) {
-        try {
-            RazorpayClient client = new RazorpayClient(razorpayKeyId, razorpayKeySecret);
-            JSONObject options = new JSONObject();
-            options.put("amount", amount.multiply(BigDecimal.valueOf(100)).intValue());
-            options.put("currency", "INR");
-            options.put("receipt", "receipt_" + System.currentTimeMillis());
-            Order order = client.orders.create(options);
-            return order.get("id");
-        } catch (RazorpayException e) {
-            log.error("Razorpay order creation failed: {}", e.getMessage());
-            throw new RuntimeException("Payment gateway error. Please try again later.");
-        }
+    @Transactional
+    public PaymentResponse rejectPayment(Long paymentId, PaymentRejectRequest request) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("Payment not found with ID: " + paymentId));
+
+        payment.setStatus(PaymentStatus.REJECTED);
+        payment.setNotes(request.getNotes());
+
+        Payment saved = paymentRepository.save(payment);
+        emailService.sendPaymentRejectedNotification(saved);
+        return mapToResponse(saved);
     }
 
-    private boolean verifySignature(String orderId, String paymentId, String signature) {
-        try {
-            String data = orderId + "|" + paymentId;
-            Mac mac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec secretKey = new SecretKeySpec(
-                    razorpayKeySecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-            mac.init(secretKey);
-            byte[] hash = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
-            String generated = HexFormat.of().formatHex(hash);
-            return generated.equals(signature);
-        } catch (Exception e) {
-            log.error("Signature verification failed: {}", e.getMessage());
-            return false;
-        }
+    @Transactional(readOnly = true)
+    public PaymentResponse getPaymentById(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("Payment not found with ID: " + paymentId));
+        return mapToResponse(payment);
     }
 
-    private User getUserByEmail(String email) {
-        return userRepo.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+    @Transactional(readOnly = true)
+    public PaymentResponse getPaymentByBookingId(Long bookingId) {
+        Payment payment = paymentRepository.findByBookingId(bookingId)
+                .orElseThrow(
+                        () -> new IllegalArgumentException("No payment record found for booking ID: " + bookingId));
+        return mapToResponse(payment);
     }
 
-    public PaymentResponse toResponse(Payment p) {
+    @Transactional(readOnly = true)
+    public Page<PaymentResponse> getPaymentsByStatus(PaymentStatus status, Pageable pageable) {
+        return paymentRepository.findAllByStatus(status, pageable).map(this::mapToResponse);
+    }
+
+    private PaymentResponse mapToResponse(Payment payment) {
         return PaymentResponse.builder()
-                .id(p.getId())
-                .bookingId(p.getBooking().getId())
-                .amount(p.getAmount())
-                .currency(p.getCurrency())
-                .status(p.getStatus())
-                .gatewayOrderId(p.getGatewayOrderId())
-                .gatewayPaymentId(p.getGatewayPaymentId())
-                .createdAt(p.getCreatedAt())
+                .id(payment.getId())
+                .bookingId(payment.getBooking().getId())
+                .amount(payment.getAmount())
+                .currency(payment.getCurrency())
+                .status(payment.getStatus())
+                .upiReferenceId(payment.getUpiReferenceId())
+                .confirmedAt(payment.getConfirmedAt())
+                .confirmedByAdminId(
+                        payment.getConfirmedByAdmin() != null ? payment.getConfirmedByAdmin().getId() : null)
+                .notes(payment.getNotes())
+                .createdAt(payment.getCreatedAt())
                 .build();
     }
 }

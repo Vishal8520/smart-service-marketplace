@@ -26,10 +26,11 @@ public class ServiceController {
     }
 
     @GetMapping
-    @Operation(summary = "Search active service listings with optional category/tag filters and pagination")
+    @Operation(summary = "Search active service listings with optional city/category/tag filters and pagination")
     public ResponseEntity<Page<ServiceResponse>> searchServices(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long cityId,
             @RequestParam(required = false) String tag,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -37,7 +38,7 @@ public class ServiceController {
             @RequestParam(defaultValue = "desc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return ResponseEntity.ok(serviceListingService.searchServices(keyword, categoryId, tag, pageable));
+        return ResponseEntity.ok(serviceListingService.searchServices(keyword, categoryId, cityId, tag, pageable));
     }
 
     @GetMapping("/{id}")
@@ -47,7 +48,7 @@ public class ServiceController {
     }
 
     @PostMapping
-    @Operation(summary = "Create a new service listing (Passwordless Provider Flow)")
+    @Operation(summary = "Create a new service listing (Passwordless Provider Flow, defaults to PENDING_REVIEW)")
     public ResponseEntity<ServiceResponse> createService(@Valid @RequestBody ServiceRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(serviceListingService.createService(request, request.getProviderEmail()));

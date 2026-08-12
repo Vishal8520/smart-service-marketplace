@@ -5,7 +5,6 @@ import com.example.marketplace.dto.request.BookingStatusRequest;
 import com.example.marketplace.dto.response.BookingResponse;
 import com.example.marketplace.entity.*;
 import com.example.marketplace.exception.ResourceNotFoundException;
-import com.example.marketplace.exception.UnauthorizedException;
 import com.example.marketplace.repository.BookingRepository;
 import com.example.marketplace.repository.PaymentRepository;
 import com.example.marketplace.repository.ServiceListingRepository;
@@ -25,15 +24,15 @@ public class BookingService {
     private final UserRepository userRepo;
     private final ServiceListingRepository serviceRepo;
     private final PaymentRepository paymentRepo;
-    private final NotificationService notificationService;
+    private final EmailService emailService;
 
     public BookingService(BookingRepository bookingRepo, UserRepository userRepo, ServiceListingRepository serviceRepo,
-            PaymentRepository paymentRepo, NotificationService notificationService) {
+            PaymentRepository paymentRepo, EmailService emailService) {
         this.bookingRepo = bookingRepo;
         this.userRepo = userRepo;
         this.serviceRepo = serviceRepo;
         this.paymentRepo = paymentRepo;
-        this.notificationService = notificationService;
+        this.emailService = emailService;
     }
 
     @Transactional
@@ -77,7 +76,7 @@ public class BookingService {
                 .build();
 
         Booking saved = bookingRepo.save(booking);
-        notificationService.sendBookingConfirmation(saved);
+        emailService.sendBookingSubmittedNotification(saved);
         return toResponse(saved);
     }
 
@@ -87,14 +86,13 @@ public class BookingService {
         booking.setStatus(BookingStatus.CONFIRMED);
         Booking saved = bookingRepo.save(booking);
 
-        // Record simulated payment
+        // Record payment in PENDING state awaiting admin confirmation
         Payment payment = Payment.builder()
                 .booking(saved)
                 .amount(saved.getService().getPrice())
                 .currency("INR")
-                .status(PaymentStatus.SUCCESS)
-                .gatewayOrderId("PAY_MOCK_" + System.currentTimeMillis())
-                .gatewayPaymentId("PAY_TXN_" + System.currentTimeMillis())
+                .status(PaymentStatus.PENDING)
+                .upiReferenceId("PAY_REF_" + System.currentTimeMillis())
                 .build();
         paymentRepo.save(payment);
 

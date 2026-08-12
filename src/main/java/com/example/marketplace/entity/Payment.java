@@ -26,13 +26,20 @@ public class Payment {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20, columnDefinition = "VARCHAR(20)")
-    private PaymentStatus status = PaymentStatus.INITIATED;
+    private PaymentStatus status = PaymentStatus.PENDING;
 
-    @Column(name = "gateway_order_id", length = 100)
-    private String gatewayOrderId;
+    @Column(name = "upi_reference_id", length = 150)
+    private String upiReferenceId;
 
-    @Column(name = "gateway_payment_id", length = 100)
-    private String gatewayPaymentId;
+    @Column(name = "confirmed_at")
+    private Instant confirmedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "confirmed_by_admin_id")
+    private User confirmedByAdmin;
+
+    @Column(length = 500)
+    private String notes;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -42,14 +49,16 @@ public class Payment {
     }
 
     public Payment(Long id, Booking booking, BigDecimal amount, String currency, PaymentStatus status,
-            String gatewayOrderId, String gatewayPaymentId, Instant createdAt) {
+            String upiReferenceId, Instant confirmedAt, User confirmedByAdmin, String notes, Instant createdAt) {
         this.id = id;
         this.booking = booking;
         this.amount = amount;
         this.currency = currency != null ? currency : "INR";
-        this.status = status != null ? status : PaymentStatus.INITIATED;
-        this.gatewayOrderId = gatewayOrderId;
-        this.gatewayPaymentId = gatewayPaymentId;
+        this.status = status != null ? status : PaymentStatus.PENDING;
+        this.upiReferenceId = upiReferenceId;
+        this.confirmedAt = confirmedAt;
+        this.confirmedByAdmin = confirmedByAdmin;
+        this.notes = notes;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
     }
 
@@ -62,9 +71,11 @@ public class Payment {
         private Booking booking;
         private BigDecimal amount;
         private String currency = "INR";
-        private PaymentStatus status = PaymentStatus.INITIATED;
-        private String gatewayOrderId;
-        private String gatewayPaymentId;
+        private PaymentStatus status = PaymentStatus.PENDING;
+        private String upiReferenceId;
+        private Instant confirmedAt;
+        private User confirmedByAdmin;
+        private String notes;
         private Instant createdAt;
 
         public Builder id(Long id) {
@@ -92,13 +103,23 @@ public class Payment {
             return this;
         }
 
-        public Builder gatewayOrderId(String gatewayOrderId) {
-            this.gatewayOrderId = gatewayOrderId;
+        public Builder upiReferenceId(String upiReferenceId) {
+            this.upiReferenceId = upiReferenceId;
             return this;
         }
 
-        public Builder gatewayPaymentId(String gatewayPaymentId) {
-            this.gatewayPaymentId = gatewayPaymentId;
+        public Builder confirmedAt(Instant confirmedAt) {
+            this.confirmedAt = confirmedAt;
+            return this;
+        }
+
+        public Builder confirmedByAdmin(User confirmedByAdmin) {
+            this.confirmedByAdmin = confirmedByAdmin;
+            return this;
+        }
+
+        public Builder notes(String notes) {
+            this.notes = notes;
             return this;
         }
 
@@ -108,7 +129,8 @@ public class Payment {
         }
 
         public Payment build() {
-            return new Payment(id, booking, amount, currency, status, gatewayOrderId, gatewayPaymentId, createdAt);
+            return new Payment(id, booking, amount, currency, status, upiReferenceId, confirmedAt, confirmedByAdmin,
+                    notes, createdAt);
         }
     }
 
@@ -152,20 +174,36 @@ public class Payment {
         this.status = status;
     }
 
-    public String getGatewayOrderId() {
-        return gatewayOrderId;
+    public String getUpiReferenceId() {
+        return upiReferenceId;
     }
 
-    public void setGatewayOrderId(String gatewayOrderId) {
-        this.gatewayOrderId = gatewayOrderId;
+    public void setUpiReferenceId(String upiReferenceId) {
+        this.upiReferenceId = upiReferenceId;
     }
 
-    public String getGatewayPaymentId() {
-        return gatewayPaymentId;
+    public Instant getConfirmedAt() {
+        return confirmedAt;
     }
 
-    public void setGatewayPaymentId(String gatewayPaymentId) {
-        this.gatewayPaymentId = gatewayPaymentId;
+    public void setConfirmedAt(Instant confirmedAt) {
+        this.confirmedAt = confirmedAt;
+    }
+
+    public User getConfirmedByAdmin() {
+        return confirmedByAdmin;
+    }
+
+    public void setConfirmedByAdmin(User confirmedByAdmin) {
+        this.confirmedByAdmin = confirmedByAdmin;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
     }
 
     public Instant getCreatedAt() {

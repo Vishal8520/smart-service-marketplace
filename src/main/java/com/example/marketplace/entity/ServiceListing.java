@@ -32,6 +32,14 @@ public class ServiceListing {
     @JoinColumn(name = "provider_id", nullable = false)
     private User provider;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "city_id")
+    private City city;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20, columnDefinition = "VARCHAR(20)")
+    private ServiceStatus status = ServiceStatus.APPROVED;
+
     @ElementCollection
     @CollectionTable(name = "service_tags", joinColumns = @JoinColumn(name = "service_id"))
     @Column(name = "tag")
@@ -51,13 +59,16 @@ public class ServiceListing {
     }
 
     public ServiceListing(Long id, String title, String description, BigDecimal price, Category category, User provider,
-            List<String> tags, Double averageRating, boolean active, Instant createdAt) {
+            City city, ServiceStatus status, List<String> tags, Double averageRating, boolean active,
+            Instant createdAt) {
         this.id = id;
         this.title = title;
         this.description = description;
         this.price = price;
         this.category = category;
         this.provider = provider;
+        this.city = city;
+        this.status = status != null ? status : ServiceStatus.APPROVED;
         this.tags = tags;
         this.averageRating = averageRating != null ? averageRating : 0.0;
         this.active = active;
@@ -75,6 +86,8 @@ public class ServiceListing {
         private BigDecimal price;
         private Category category;
         private User provider;
+        private City city;
+        private ServiceStatus status = ServiceStatus.APPROVED;
         private List<String> tags;
         private Double averageRating = 0.0;
         private boolean active = true;
@@ -110,6 +123,16 @@ public class ServiceListing {
             return this;
         }
 
+        public Builder city(City city) {
+            this.city = city;
+            return this;
+        }
+
+        public Builder status(ServiceStatus status) {
+            this.status = status;
+            return this;
+        }
+
         public Builder tags(List<String> tags) {
             this.tags = tags;
             return this;
@@ -131,8 +154,8 @@ public class ServiceListing {
         }
 
         public ServiceListing build() {
-            return new ServiceListing(id, title, description, price, category, provider, tags, averageRating, active,
-                    createdAt);
+            return new ServiceListing(id, title, description, price, category, provider, city, status, tags,
+                    averageRating, active, createdAt);
         }
     }
 
@@ -182,6 +205,22 @@ public class ServiceListing {
 
     public void setProvider(User provider) {
         this.provider = provider;
+    }
+
+    public City getCity() {
+        return city;
+    }
+
+    public void setCity(City city) {
+        this.city = city;
+    }
+
+    public ServiceStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(ServiceStatus status) {
+        this.status = status;
     }
 
     public List<String> getTags() {

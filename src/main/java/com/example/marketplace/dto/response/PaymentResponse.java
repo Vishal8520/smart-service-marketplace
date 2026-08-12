@@ -12,22 +12,26 @@ public class PaymentResponse {
     private BigDecimal amount;
     private String currency;
     private PaymentStatus status;
-    private String gatewayOrderId;
-    private String gatewayPaymentId;
+    private String upiReferenceId;
+    private Instant confirmedAt;
+    private Long confirmedByAdminId;
+    private String notes;
     private Instant createdAt;
 
     public PaymentResponse() {
     }
 
     public PaymentResponse(Long id, Long bookingId, BigDecimal amount, String currency, PaymentStatus status,
-            String gatewayOrderId, String gatewayPaymentId, Instant createdAt) {
+            String upiReferenceId, Instant confirmedAt, Long confirmedByAdminId, String notes, Instant createdAt) {
         this.id = id;
         this.bookingId = bookingId;
         this.amount = amount;
         this.currency = currency;
         this.status = status;
-        this.gatewayOrderId = gatewayOrderId;
-        this.gatewayPaymentId = gatewayPaymentId;
+        this.upiReferenceId = upiReferenceId;
+        this.confirmedAt = confirmedAt;
+        this.confirmedByAdminId = confirmedByAdminId;
+        this.notes = notes;
         this.createdAt = createdAt;
     }
 
@@ -41,8 +45,10 @@ public class PaymentResponse {
         private BigDecimal amount;
         private String currency;
         private PaymentStatus status;
-        private String gatewayOrderId;
-        private String gatewayPaymentId;
+        private String upiReferenceId;
+        private Instant confirmedAt;
+        private Long confirmedByAdminId;
+        private String notes;
         private Instant createdAt;
 
         public Builder id(Long id) {
@@ -70,13 +76,23 @@ public class PaymentResponse {
             return this;
         }
 
-        public Builder gatewayOrderId(String gatewayOrderId) {
-            this.gatewayOrderId = gatewayOrderId;
+        public Builder upiReferenceId(String upiReferenceId) {
+            this.upiReferenceId = upiReferenceId;
             return this;
         }
 
-        public Builder gatewayPaymentId(String gatewayPaymentId) {
-            this.gatewayPaymentId = gatewayPaymentId;
+        public Builder confirmedAt(Instant confirmedAt) {
+            this.confirmedAt = confirmedAt;
+            return this;
+        }
+
+        public Builder confirmedByAdminId(Long confirmedByAdminId) {
+            this.confirmedByAdminId = confirmedByAdminId;
+            return this;
+        }
+
+        public Builder notes(String notes) {
+            this.notes = notes;
             return this;
         }
 
@@ -86,8 +102,8 @@ public class PaymentResponse {
         }
 
         public PaymentResponse build() {
-            return new PaymentResponse(id, bookingId, amount, currency, status, gatewayOrderId, gatewayPaymentId,
-                    createdAt);
+            return new PaymentResponse(id, bookingId, amount, currency, status, upiReferenceId, confirmedAt,
+                    confirmedByAdminId, notes, createdAt);
         }
     }
 
@@ -131,20 +147,36 @@ public class PaymentResponse {
         this.status = status;
     }
 
-    public String getGatewayOrderId() {
-        return gatewayOrderId;
+    public String getUpiReferenceId() {
+        return upiReferenceId;
     }
 
-    public void setGatewayOrderId(String gatewayOrderId) {
-        this.gatewayOrderId = gatewayOrderId;
+    public void setUpiReferenceId(String upiReferenceId) {
+        this.upiReferenceId = upiReferenceId;
     }
 
-    public String getGatewayPaymentId() {
-        return gatewayPaymentId;
+    public Instant getConfirmedAt() {
+        return confirmedAt;
     }
 
-    public void setGatewayPaymentId(String gatewayPaymentId) {
-        this.gatewayPaymentId = gatewayPaymentId;
+    public void setConfirmedAt(Instant confirmedAt) {
+        this.confirmedAt = confirmedAt;
+    }
+
+    public Long getConfirmedByAdminId() {
+        return confirmedByAdminId;
+    }
+
+    public void setConfirmedByAdminId(Long confirmedByAdminId) {
+        this.confirmedByAdminId = confirmedByAdminId;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
     }
 
     public Instant getCreatedAt() {

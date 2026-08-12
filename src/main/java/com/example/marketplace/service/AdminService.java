@@ -1,9 +1,19 @@
 package com.example.marketplace.service;
 
+import com.example.marketplace.dto.request.PaymentConfirmRequest;
+import com.example.marketplace.dto.request.PaymentRejectRequest;
 import com.example.marketplace.dto.response.AdminAnalyticsResponse;
+import com.example.marketplace.dto.response.PaymentResponse;
+import com.example.marketplace.dto.response.ServiceResponse;
 import com.example.marketplace.entity.BookingStatus;
+import com.example.marketplace.entity.PaymentStatus;
 import com.example.marketplace.entity.RoleType;
+import com.example.marketplace.entity.ServiceListing;
+import com.example.marketplace.entity.ServiceStatus;
+import com.example.marketplace.exception.ResourceNotFoundException;
 import com.example.marketplace.repository.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,15 +27,20 @@ public class AdminService {
     private final BookingRepository bookingRepository;
     private final ReviewRepository reviewRepository;
     private final PaymentRepository paymentRepository;
+    private final PaymentService paymentService;
+    private final ServiceListingService serviceListingService;
 
     public AdminService(UserRepository userRepository, ServiceListingRepository serviceListingRepository,
             BookingRepository bookingRepository, ReviewRepository reviewRepository,
-            PaymentRepository paymentRepository) {
+            PaymentRepository paymentRepository, PaymentService paymentService,
+            ServiceListingService serviceListingService) {
         this.userRepository = userRepository;
         this.serviceListingRepository = serviceListingRepository;
         this.bookingRepository = bookingRepository;
         this.reviewRepository = reviewRepository;
         this.paymentRepository = paymentRepository;
+        this.paymentService = paymentService;
+        this.serviceListingService = serviceListingService;
     }
 
     @Transactional(readOnly = true)
@@ -60,5 +75,54 @@ public class AdminService {
                 .totalRevenue(totalRevenue)
                 .averagePlatformRating(averagePlatformRating)
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ServiceResponse> getServicesByStatus(ServiceStatus status, Pageable pageable) {
+        return serviceListingRepository.findAllByStatus(status, pageable)
+                .map(serviceListingService::toResponse);
+    }
+
+    @Transactional
+    public ServiceResponse approveService(Long id) {
+        ServiceListing service = getServiceById(id);
+        service.setStatus(ServiceStatus.APPROVED);
+        service.setActive(true);
+        return serviceListingService.toResponse(serviceListingRepository.save(service));
+    }
+
+    @Transactional
+    public ServiceResponse rejectService(Long id) {
+        ServiceListing service = getServiceById(id);
+        service.setStatus(ServiceStatus.REJECTED);
+        service.setActive(false);
+        return serviceListingService.toResponse(serviceListingRepository.save(service));
+    }
+
+    @Transactional
+    public ServiceResponse toggleServiceActive(Long id) {
+        ServiceListing service = getServiceById(id);
+        service.setActive(!service.isActive());
+        return serviceListingService.toResponse(serviceListingRepository.save(service));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PaymentResponse> getPaymentsByStatus(PaymentStatus status, Pageable pageable) {
+        return paymentService.getPaymentsByStatus(status, pageable);
+    }
+
+    @Transactional
+    public PaymentResponse confirmPayment(Long paymentId, PaymentConfirmRequest request, String adminEmail) {
+        return paymentService.confirmPayment(paymentId, request, adminEmail);
+    }
+
+    @Transactional
+    public PaymentResponse rejectPayment(Long paymentId, PaymentRejectRequest request) {
+        return paymentService.rejectPayment(paymentId, request);
+    }
+
+    private ServiceListing getServiceById(Long id) {
+        return serviceListingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ServiceListing", "id", id));
     }
 }
