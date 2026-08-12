@@ -643,6 +643,69 @@
       color: #fff;
     }
 
+    /* ── Visual Stepper for Customer Bookings ── */
+    .booking-stepper {
+      display: flex;
+      align-items: center;
+      gap: .25rem;
+      margin: .25rem 0;
+      font-size: .75rem;
+    }
+
+    .b-step {
+      display: flex;
+      align-items: center;
+      gap: .2rem;
+      padding: .2rem .4rem;
+      border-radius: 4px;
+      background: var(--gray-100);
+      color: var(--gray-600);
+      font-weight: 600;
+    }
+
+    .b-step.active {
+      background: var(--amber);
+      color: var(--navy);
+    }
+
+    .b-step.done {
+      background: #e6f4ea;
+      color: #137333;
+    }
+
+    .b-step.cancelled {
+      background: #fce8e6;
+      color: #c5221f;
+    }
+
+    .b-arrow {
+      color: var(--gray-400);
+      font-size: .7rem;
+    }
+
+    .pagination-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: .75rem 0;
+      margin-top: .5rem;
+    }
+
+    .page-btn {
+      padding: .35rem .75rem;
+      border: 1px solid var(--gray-300);
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: .8rem;
+    }
+
+    .page-btn:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
     footer {
       background: var(--navy);
       color: #ddd;
@@ -827,10 +890,17 @@
     <div id="view-bookings" class="view">
       <div class="panel">
         <div class="panel-header">
-          <h2 class="section-title" style="margin-bottom:0;border:none">My Bookings & Payment Status</h2>
-          <div style="display:flex;gap:.5rem">
-            <input class="form-control" id="myEmail" placeholder="Enter your email" style="width:260px">
-            <button class="btn btn-amber" onclick="loadMyBookings()">Fetch My Bookings</button>
+          <h2 class="section-title" style="margin-bottom:0;border:none">My Bookings Tracker</h2>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <select class="form-control" id="myBookingStatus" onchange="changeMyBookingFilter()" style="width:160px">
+              <option value="">All Statuses</option>
+              <option value="PENDING">PENDING</option>
+              <option value="CONFIRMED">CONFIRMED</option>
+              <option value="COMPLETED">COMPLETED</option>
+              <option value="CANCELLED">CANCELLED</option>
+            </select>
+            <input class="form-control" id="myEmail" placeholder="Enter customer email" style="width:220px">
+            <button class="btn btn-amber" onclick="fetchMyBookings(0)">Fetch My Bookings</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -838,12 +908,12 @@
             <thead>
               <tr>
                 <th>#ID</th>
-                <th>Service</th>
-                <th>Address</th>
-                <th>Scheduled</th>
-                <th>Booking Status</th>
+                <th>Service & Provider</th>
+                <th>Address & Date</th>
+                <th>Progress Stepper</th>
+                <th>Status</th>
                 <th>Provider Contact</th>
-                <th>Action / Payment</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="bookings-body">
@@ -853,6 +923,11 @@
               </tr>
             </tbody>
           </table>
+        </div>
+        <div class="pagination-bar" id="bookings-pagination" style="display:none">
+          <button class="page-btn" id="b-prev-btn" onclick="changeMyBookingPage(-1)">← Previous</button>
+          <span id="b-page-info" style="font-size:.85rem;color:var(--gray-600)">Page 1 of 1</span>
+          <button class="page-btn" id="b-next-btn" onclick="changeMyBookingPage(1)">Next →</button>
         </div>
       </div>
     </div>
@@ -1220,49 +1295,118 @@
       }
     }
 
-    // ── MY BOOKINGS ──
-    async function loadMyBookings() {
+    // ── MY BOOKINGS TRACKER & PAGINATION ──
+    let myBookingsPage = 0;
+    let myBookingsTotalPages = 1;
+
+    function changeMyBookingFilter() {
+      fetchMyBookings(0);
+    }
+
+    function changeMyBookingPage(delta) {
+      const targetPage = myBookingsPage + delta;
+      if (targetPage >= 0 && targetPage < myBookingsTotalPages) {
+        fetchMyBookings(targetPage);
+      }
+    }
+
+    async function fetchMyBookings(page = 0) {
+      myBookingsPage = page;
       const email = document.getElementById('myEmail').value.trim();
+      const status = document.getElementById('myBookingStatus').value;
       const tbody = document.getElementById('bookings-body');
-      if (!email) { toast('Enter your email', true); return; }
+      const pagBar = document.getElementById('bookings-pagination');
+
+      if (!email) {
+        toast('Enter your email to fetch bookings', true);
+        return;
+      }
+
+      updateUrlState('bookings', { email, status, page });
+
       try {
-        const r = await fetch(`/api/bookings/customer?email=${encodeURIComponent(email)}&size=50`);
+        let url = `/api/bookings/me?email=${encodeURIComponent(email)}&page=${page}&size=10`;
+        if (status) url += `&status=${encodeURIComponent(status)}`;
+
+        const r = await fetch(url);
+        if (!r.ok) throw new Error('Failed to fetch bookings');
         const data = await r.json();
         const rows = data.content || [];
+        myBookingsTotalPages = data.totalPages || 1;
+
         if (!rows.length) {
           tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:1.5rem">No bookings found for ${esc(email)}</td></tr>`;
+          pagBar.style.display = 'none';
           return;
         }
+
         tbody.innerHTML = rows.map(b => {
           const isPaid = b.status === 'CONFIRMED' || b.status === 'COMPLETED';
-          return `<tr>
+          const isCancelled = b.status === 'CANCELLED';
+
+          // Visual Stepper derivation
+          const s1Class = 'b-step done';
+          let s2Class = 'b-step';
+          let s3Class = 'b-step';
+
+          if (isCancelled) {
+            s2Class = 'b-step cancelled';
+            s3Class = 'b-step cancelled';
+          } else if (b.status === 'COMPLETED') {
+            s2Class = 'b-step done';
+            s3Class = 'b-step done';
+          } else if (isPaid) {
+            s2Class = 'b-step done';
+            s3Class = 'b-step active';
+          } else {
+            s2Class = 'b-step active';
+          }
+
+          const stepperHtml = `
+            <div class="booking-stepper">
+              <span class="${s1Class}">1. Booked ✓</span>
+              <span class="b-arrow">→</span>
+              <span class="${s2Class}">${isPaid ? '2. Payment Verified ✓' : '2. Payment Pending'}</span>
+              <span class="b-arrow">→</span>
+              <span class="${s3Class}">${b.status === 'COMPLETED' ? '3. Completed ✓' : '3. Fulfilled'}</span>
+            </div>
+          `;
+
+          return `<tr id="brow-${b.id}">
             <td>#${b.id}</td>
-            <td><strong>${esc(b.serviceTitle)}</strong></td>
-            <td>${esc(b.address || 'N/A')}</td>
-            <td>${b.scheduledAt ? new Date(b.scheduledAt).toLocaleString() : ''}</td>
-            <td><span class="badge ${isPaid ? 'badge-confirmed' : 'badge-pending'}">${b.status}</span></td>
+            <td><strong>${esc(b.serviceTitle)}</strong><br><small>Provider: ${esc(b.providerName || 'Assigned')}</small></td>
+            <td>${esc(b.address || 'N/A')}<br><small>${b.scheduledAt ? new Date(b.scheduledAt).toLocaleString() : ''}</small></td>
+            <td>${stepperHtml}</td>
+            <td><span class="badge ${isPaid ? 'badge-confirmed' : (isCancelled ? 'badge-cancelled' : 'badge-pending')}">${b.status}</span></td>
             <td>${isPaid ? `📞 ${esc(b.providerPhone || 'N/A')}<br>✉ ${esc(b.providerEmail || 'N/A')}` : '🔒 Contact Hidden Until Verification'}</td>
-            <td>${!isPaid ? `<button class="btn btn-amber btn-sm" onclick="promptPayRef(${b.id})">Submit UPI Ref</button>` : 'Verified'}</td>
+            <td>${!isPaid && !isCancelled ? `<button class="btn btn-amber btn-sm" onclick="promptPayRef(${b.id})">Submit UPI Ref</button>` : '—'}</td>
           </tr>`;
         }).join('');
+
+        // Pagination controls update
+        pagBar.style.display = 'flex';
+        document.getElementById('b-page-info').textContent = `Page ${page + 1} of ${myBookingsTotalPages}`;
+        document.getElementById('b-prev-btn').disabled = page <= 0;
+        document.getElementById('b-next-btn').disabled = page >= myBookingsTotalPages - 1;
+
       } catch (err) { toast(err.message, true); }
     }
 
     function promptPayRef(bookingId) {
       const ref = prompt(`Enter UPI Reference Transaction ID for Booking #${bookingId}:`);
-      if (ref) {
+      if (ref && ref.trim()) {
         fetch('/api/payments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bookingId: bookingId, upiReferenceId: ref })
+          body: JSON.stringify({ bookingId: bookingId, upiReferenceId: ref.trim() })
         }).then(r => r.json()).then(data => {
-          toast('UPI reference updated!');
-          loadMyBookings();
+          toast('UPI reference submitted for review!');
+          fetchMyBookings(myBookingsPage);
         });
       }
     }
 
-    // ── ADMIN PORTAL ──
+    // ── ADMIN PORTAL & ONE-CLICK UPI VERIFICATION ──
     async function adminLogin(e) {
       e.preventDefault();
       const email = document.getElementById('admin_email').value.trim();
@@ -1302,6 +1446,7 @@
       ['services', 'payments', 'cities'].forEach(s => {
         document.getElementById('admin-sec-' + s).style.display = s === name ? 'block' : 'none';
       });
+      updateUrlState('admin', { tab: name });
       if (name === 'services') loadAdminPendingServices();
       if (name === 'payments') loadAdminPendingPayments();
       if (name === 'cities') loadAdminCities();
@@ -1351,6 +1496,7 @@
       loadAdminPendingServices();
     }
 
+    // ── ONE-CLICK UPI VERIFICATION ──
     async function loadAdminPendingPayments() {
       const tbody = document.getElementById('admin-payments-body');
       try {
@@ -1363,40 +1509,110 @@
           tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:1.5rem">No pending payment references to confirm</td></tr>`;
           return;
         }
-        tbody.innerHTML = rows.map(p => `<tr>
+        tbody.innerHTML = rows.map(p => `<tr id="pay-row-${p.id}">
           <td>#${p.id}</td>
           <td>#${p.bookingId}</td>
           <td>₹${p.amount}</td>
-          <td><code>${p.upiReferenceId}</code></td>
+          <td><code title="Unverified reference string">${p.upiReferenceId}</code></td>
           <td>${new Date(p.createdAt).toLocaleString()}</td>
-          <td>
-            <button class="btn btn-success btn-sm" onclick="confirmPayment(${p.id})">Confirm & Unlock Contact</button>
-            <button class="btn btn-danger btn-sm" onclick="rejectPayment(${p.id})">Reject</button>
+          <td style="display:flex;gap:.4rem;align-items:center">
+            <button class="btn btn-success btn-sm" id="btn-conf-${p.id}" onclick="oneClickConfirmPayment(${p.id})">✓ One-Click Confirm</button>
+            <select class="form-control" style="width:130px;padding:.2rem .4rem;font-size:.75rem" onchange="oneClickRejectPayment(${p.id}, this.value)">
+              <option value="">Quick Reject…</option>
+              <option value="UPI ref not found">Ref Not Found</option>
+              <option value="Amount mismatch">Amount Mismatch</option>
+              <option value="Duplicate reference">Duplicate Ref</option>
+              <option value="OTHER">Other Reason…</option>
+            </select>
           </td>
         </tr>`).join('');
       } catch (e) { }
     }
 
-    async function confirmPayment(id) {
-      await fetch(`/api/admin/payments/${id}/confirm`, {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + adminJwt, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes: 'Verified by Admin via UPI transaction logs' })
-      });
-      toast(`Payment #${id} confirmed! Email notification sent.`);
-      loadAdminPendingPayments();
+    async function oneClickConfirmPayment(id) {
+      const btn = document.getElementById(`btn-conf-${id}`);
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Confirming...'; }
+
+      try {
+        const r = await fetch(`/api/admin/payments/${id}/confirm`, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + adminJwt, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: 'Verified by Admin via one-click confirm' })
+        });
+        if (!r.ok) throw new Error('Confirmation failed');
+        toast(`Payment #${id} confirmed! Email notifications fired.`);
+        const row = document.getElementById(`pay-row-${id}`);
+        if (row) row.remove();
+        if (!document.querySelectorAll('#admin-payments-body tr').length) {
+          loadAdminPendingPayments();
+        }
+      } catch (err) {
+        toast(err.message, true);
+        if (btn) { btn.disabled = false; btn.textContent = '✓ One-Click Confirm'; }
+      }
     }
 
-    async function rejectPayment(id) {
-      const reason = prompt('Reason for rejection:') || 'Invalid reference string';
-      await fetch(`/api/admin/payments/${id}/reject`, {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + adminJwt, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes: reason })
-      });
-      toast(`Payment #${id} rejected.`);
-      loadAdminPendingPayments();
+    async function oneClickRejectPayment(id, chosenReason) {
+      if (!chosenReason) return;
+      let reason = chosenReason;
+      if (chosenReason === 'OTHER') {
+        reason = prompt('Enter custom rejection reason:') || 'Unverified reference';
+      }
+
+      try {
+        const r = await fetch(`/api/admin/payments/${id}/reject`, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + adminJwt, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: reason })
+        });
+        if (!r.ok) throw new Error('Rejection failed');
+        toast(`Payment #${id} rejected (${reason}).`);
+        const row = document.getElementById(`pay-row-${id}`);
+        if (row) row.remove();
+        if (!document.querySelectorAll('#admin-payments-body tr').length) {
+          loadAdminPendingPayments();
+        }
+      } catch (err) { toast(err.message, true); }
     }
+
+    // ── URL PERSISTENT STATE MANAGEMENT ──
+    function updateUrlState(view, params = {}) {
+      const hashParams = new URLSearchParams();
+      hashParams.set('view', view);
+      Object.keys(params).forEach(k => {
+        if (params[k] !== null && params[k] !== undefined && params[k] !== '') {
+          hashParams.set(k, params[k]);
+        }
+      });
+      window.location.hash = hashParams.toString();
+    }
+
+    function syncStateFromUrl() {
+      if (!window.location.hash) return;
+      const hashStr = window.location.hash.substring(1);
+      const params = new URLSearchParams(hashStr);
+      const view = params.get('view');
+
+      if (view) {
+        showView(view);
+        if (view === 'bookings') {
+          const email = params.get('email');
+          const status = params.get('status');
+          const page = parseInt(params.get('page') || '0', 10);
+          if (email) document.getElementById('myEmail').value = email;
+          if (status) document.getElementById('myBookingStatus').value = status;
+          if (email) fetchMyBookings(page);
+        } else if (view === 'admin') {
+          const tab = params.get('tab');
+          if (tab) switchAdminTab(tab);
+        }
+      }
+    }
+
+    window.addEventListener('hashchange', syncStateFromUrl);
+    window.addEventListener('DOMContentLoaded', () => {
+      syncStateFromUrl();
+    });
 
     async function loadAdminCities() {
       const tbody = document.getElementById('admin-cities-body');

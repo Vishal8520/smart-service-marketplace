@@ -38,14 +38,33 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.payBooking(id));
     }
 
+    @GetMapping("/me")
+    @Operation(summary = "Get bookings for currently authenticated customer with optional status filter & pagination")
+    public ResponseEntity<Page<BookingResponse>> getMyBookings(
+            @RequestParam(required = false) com.example.marketplace.entity.BookingStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String email,
+            org.springframework.security.core.Authentication authentication) {
+        String authenticatedEmail = (authentication != null && authentication.getName() != null)
+                ? authentication.getName()
+                : email;
+        if (authenticatedEmail == null || authenticatedEmail.isBlank()) {
+            throw new IllegalArgumentException("Authentication or email query parameter required");
+        }
+        Pageable pageable = PageRequest.of(page, size);
+        return ResponseEntity.ok(bookingService.getCustomerBookingsWithStatus(authenticatedEmail, status, pageable));
+    }
+
     @GetMapping("/customer")
     @Operation(summary = "Get bookings for customer by email")
     public ResponseEntity<Page<BookingResponse>> getCustomerBookings(
             @RequestParam String email,
+            @RequestParam(required = false) com.example.marketplace.entity.BookingStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(bookingService.getCustomerBookings(email, pageable));
+        return ResponseEntity.ok(bookingService.getCustomerBookingsWithStatus(email, status, pageable));
     }
 
     @GetMapping("/provider")

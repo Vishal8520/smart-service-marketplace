@@ -105,6 +105,16 @@ public class BookingService {
                 .map(this::toResponse);
     }
 
+    public Page<BookingResponse> getCustomerBookingsWithStatus(String customerEmail, BookingStatus status,
+            Pageable pageable) {
+        User customer = getUserByEmail(customerEmail);
+        if (status == null) {
+            return getCustomerBookings(customerEmail, pageable);
+        }
+        return bookingRepo.findByCustomerIdAndStatusOrderByCreatedAtDesc(customer.getId(), status, pageable)
+                .map(this::toResponse);
+    }
+
     public Page<BookingResponse> getProviderBookings(String providerEmail, Pageable pageable) {
         User provider = getUserByEmail(providerEmail);
         return bookingRepo.findByServiceProviderIdOrderByCreatedAtDesc(provider.getId(), pageable)

@@ -18,6 +18,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     Page<Booking> findByCustomerIdOrderByCreatedAtDesc(Long customerId, Pageable pageable);
 
     @EntityGraph(attributePaths = { "customer", "service", "service.category", "service.provider" })
+    Page<Booking> findByCustomerIdAndStatusOrderByCreatedAtDesc(Long customerId, BookingStatus status,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = { "customer", "service", "service.category", "service.provider" })
     @Query("SELECT b FROM Booking b WHERE b.service.provider.id = :providerId ORDER BY b.createdAt DESC")
     Page<Booking> findByServiceProviderIdOrderByCreatedAtDesc(@Param("providerId") Long providerId, Pageable pageable);
 
