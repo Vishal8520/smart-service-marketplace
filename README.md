@@ -6,7 +6,7 @@
 [![Java 17+](https://img.shields.io/badge/Java-17%2B-orange.svg?style=for-the-badge&logo=openjdk)](https://www.oracle.com/java/)
 [![Spring Boot 3.2.5](https://img.shields.io/badge/Spring%20Boot-3.2.5-brightgreen.svg?style=for-the-badge&logo=springboot)](https://spring.io/projects/spring-boot)
 [![MySQL 8.0](https://img.shields.io/badge/MySQL-8.0-blue.svg?style=for-the-badge&logo=mysql)](https://www.mysql.com/)
-[![Flyway Migrations](https://img.shields.io/badge/Flyway-10.x-red.svg?style=for-the-badge&logo=flyway)](https://flywaydb.org/)
+[![Flyway Migrations](https://img.shields.io/badge/Flyway-V1--V8-red.svg?style=for-the-badge&logo=flyway)](https://flywaydb.org/)
 [![Docker Ready](https://img.shields.io/badge/Docker-Enabled-2496ED.svg?style=for-the-badge&logo=docker)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
@@ -22,14 +22,14 @@
 
 ## 📖 Executive Summary
 
-Modern service platforms require a balance between **low user friction**, **strict privacy controls**, **secure reference-based payments**, and **reliable background communication**. 
+Modern service platforms require a balance between **low user friction**, **strict privacy controls**, **auto-approved reference payments**, **immutable audit trails**, and **reliable database performance**. 
 
 **ServeNow** is engineered to address these core challenges:
-- **City-Based Service Discovery**: Multi-city filtering allowing users to discover active, approved services in their specific city.
-- **Reference-and-Confirm UPI Payment Engine**: Structured manual UPI transaction ID flow with admin verification, designed for seamless future Razorpay/Cashfree PSP plug-and-play drop-in.
+- **City-Based Service Discovery**: Multi-city filtering allowing users to discover active, approved services in their specific city with composite database indexing.
+- **Frictionless Auto-Approve UPI Payment Engine**: Instant payment auto-confirmation (`AUTO_CONFIRMED`) on UPI reference submission for zero-friction demoing, with an abstraction layer (`PaymentGatewayPort`) for plug-and-play PSP integration.
+- **Immutable Admin Audit Trail & Post-Hoc Reversal**: Complete state transition logging (`payment_audit_logs`) and post-hoc admin payment reversal capabilities (`POST /api/admin/payments/{id}/reverse`) that safely revert bookings and notify customers.
 - **Asynchronous Gmail Notification Subsystem**: Background thread pool executing rich HTML email alerts via `JavaMailSender` without blocking HTTP requests.
-- **Role-Secured Admin Management Console**: Full control over service listing approvals (`PENDING_REVIEW` → `APPROVED`), payment verification (`PENDING` → `CONFIRMED`), and city configuration.
-- **Server-Side Data Privacy Guard**: Provider phone & email details are strictly masked (`null`) at the backend layer until payment is confirmed by an admin.
+- **Hardened Database Layer & HikariCP Tuning**: Explicit connection pool sizing (`maximum-pool-size: 10`, `minimum-idle: 5`), socket timeouts, `@EntityGraph` N+1 query elimination, and Spring Actuator health monitoring (`/actuator/health`).
 
 ---
 
@@ -39,21 +39,22 @@ Modern service platforms require a balance between **low user friction**, **stri
 - **High-Contrast Design System**: Dark Navy (`#131921`) header, Amber action triggers (`#febd69`), and price badges (`#f08804`).
 - **City Selector Header**: Public city selection dropdown dynamically updating search scope.
 - **Interactive Multi-Category Filtering**: Instant filter across Plumbing, Electrical, Cleaning, Tutoring, Design, Web Dev, Carpentry, and Pest Control.
-- **Guided 4-Step Checkout**: `1. Details → 2. Location → 3. UPI Reference Payment → 4. Confirmation`.
+- **Customer Booking Tracker & Stepper**: Visual progress tracker (`Booked` → `Payment Verified` → `Fulfilled`) with paginated status filtering (`#bookings?status=CONFIRMED`).
 
-### 💳 Reference-Based UPI Payment & PSP Integration Layer
-- **Manual Reference-and-Confirm Flow**: Customers scan platform UPI VPA (`servenow@upi`) and submit 12-digit transaction UTR reference IDs.
+### 💳 Auto-Approve UPI Payment & Audit Engine
+- **Frictionless Auto-Confirmation**: UPI reference submission instantly auto-confirms payment (`AUTO_CONFIRMED`) and updates booking status to `CONFIRMED`.
 - **PaymentGatewayPort Interface**: Clean architectural abstraction for future PSP gateway integration.
-- **Contact Info Unlock**: Sensitive provider contact details unlock automatically upon admin payment confirmation.
+- **Post-Hoc Admin Reversal**: Admins inspect payments post-hoc and reverse suspicious entries with custom audit notes, reverting bookings back to `PENDING`.
+- **Contact Info Unlock**: Sensitive provider contact details unlock automatically upon payment confirmation.
 
 ### 📩 Asynchronous Gmail Notification System
-- **Non-Blocking Execution**: `@EnableAsync` with custom thread pool executor.
-- **Transactional HTML Templates**: Automatic background emails for booking creation, payment submission, confirmation (unlocking contact details), and rejection.
+- **Non-Blocking Execution**: `@EnableAsync` with custom thread pool executor (`AsyncConfig.java`).
+- **Transactional HTML Templates**: Automatic background emails for booking creation, payment submission, auto-confirmation, and post-hoc reversal.
 
 ### 🛡️ Admin Dashboard & Security
 - **Role-Based Access Control**: `/api/admin/**` endpoints secured with Spring Security (`ROLE_ADMIN`).
 - **Service Approvals**: Approve or reject provider-submitted listings.
-- **Payment Verification**: Verify customer UPI references against bank statements.
+- **Audit Logging**: Immutable tracking of all payment status transitions with timestamp, actor, and reason.
 - **City Management**: Add operating cities and toggle city visibility.
 
 ---
@@ -68,16 +69,16 @@ smart-service-marketplace/
 │   ├── 📁 config/          # Security, CORS, Async Thread Pool, Flyway, & OpenAPI Configs
 │   ├── 📁 controller/      # REST Endpoints (Auth, Service, Booking, Payment, Admin, City, Health)
 │   ├── 📁 dto/             # Data Transfer Objects (Request/Response Models)
-│   ├── 📁 entity/          # JPA Domain Entities (User, ServiceListing, Booking, Payment, City)
+│   ├── 📁 entity/          # JPA Domain Entities (User, ServiceListing, Booking, Payment, PaymentAuditLog, City)
 │   ├── 📁 exception/       # Centralized RFC 7807 Global Exception Handling
-│   ├── 📁 port/            # PaymentGatewayPort Abstraction Interface
+│   ├── 📁 port/            # PaymentGatewayPort Abstraction Interface & Stub Implementation
 │   ├── 📁 repository/      # Spring Data JPA Repositories (Optimized with @EntityGraph)
 │   ├── 📁 security/        # Stateless Security & JWT Authentication Filters
 │   └── 📁 service/         # Encapsulated Business Services (Payment, Email, Admin, City)
 ├── 📁 src/main/resources/
-│   ├── 📁 db/migration/    # Flyway Versioned SQL Migration Scripts
+│   ├── 📁 db/migration/    # Flyway Versioned SQL Migration Scripts (V1 to V8)
 │   ├── 📁 static/          # Single-Page Web App (index.html)
-│   └── application.yml     # Application Configuration (MySQL, Mailer, JWT Secret)
+│   └── application.yml     # Hardened Application Configuration (HikariCP, MySQL, Mailer, Actuator)
 ├── docker-compose.yml      # Multi-container Docker Stack (MySQL 8.0 + MailHog + App)
 ├── Dockerfile              # Production Container Build Specification
 └── pom.xml                 # Maven Build Dependencies
@@ -94,6 +95,7 @@ sequenceDiagram
     actor Provider as 🧑‍🔧 Service Provider
     actor Admin as 🛡️ Admin
     participant Backend as ⚙️ Spring Boot API
+    participant Audit as 📜 PaymentAuditLog
     participant Mailer as 📧 Email Subsystem (Async)
     participant DB as 🛢️ MySQL Database
 
@@ -107,12 +109,16 @@ sequenceDiagram
     Backend-->>Mailer: Trigger Booking Confirmation Email (Async)
 
     Customer->>Backend: POST /api/payments (Submit UPI Reference)
-    Backend->>DB: Save Payment (Status: PENDING)
-    Backend-->>Mailer: Trigger Payment Submitted Email (Async)
-
-    Admin->>Backend: POST /api/admin/payments/{id}/confirm
-    Backend->>DB: Update Payment -> CONFIRMED, Booking -> CONFIRMED
+    Backend->>DB: Save Payment (Status: AUTO_CONFIRMED), Booking -> CONFIRMED
+    Backend->>Audit: Log State Transition (AUTO_CONFIRM)
     Backend-->>Mailer: Trigger Payment Confirmed Email with Unlocked Contact Details
+
+    opt Post-Hoc Admin Reversal
+        Admin->>Backend: POST /api/admin/payments/{id}/reverse
+        Backend->>DB: Update Payment -> REVERSED, Booking -> PENDING
+        Backend->>Audit: Log State Transition (ADMIN_REVERSE)
+        Backend-->>Mailer: Trigger Payment Reversed Email (Async)
+    end
 ```
 
 ---
@@ -120,16 +126,16 @@ sequenceDiagram
 ## ⚡ Key Engineering Decisions
 
 > [!NOTE]
-> **1. Architectural PSP Decoupling via `PaymentGatewayPort`**
-> Rather than locking the business logic to a specific Payment Service Provider (PSP), we created `PaymentGatewayPort`. The manual UPI reference flow implements this port today, allowing future Razorpay/Cashfree integrations to be swapped in with zero changes to core service logic.
+> **1. Frictionless Auto-Approval with Post-Hoc Reversal Safety**
+> For demo environments, manual admin approvals introduce unnecessary friction. ServeNow auto-confirms payment references immediately upon submission (`AUTO_CONFIRMED`), unlocking provider contact details instantly. Safety is preserved via immutable `PaymentAuditLog` entries and post-hoc admin reversal (`POST /api/admin/payments/{id}/reverse`).
 
 > [!IMPORTANT]
-> **2. Defense-in-Depth Contact Masking**
-> Masking provider contact info on the frontend alone is insecure. In ServeNow, `BookingService.toResponse()` dynamically checks payment status (`CONFIRMED` or `COMPLETED`). If unverified, email and phone attributes are stripped at the server layer before JSON response serialization.
+> **2. Database Hardening & Indexing Strategy (Flyway V8)**
+> FK columns (`service_id`, `category_id`, `provider_id`, `city_id`) and high-traffic query targets are explicitly indexed viaFlyway migration `V8`. High-volume service discovery queries utilize a composite index on `service_listings(city_id, active, status)`.
 
 > [!TIP]
-> **3. Asynchronous Non-Blocking Email Dispatch**
-> Sending SMTP emails synchronously adds 1–3 seconds of latency to HTTP requests. By configuring Spring `@Async` with a dedicated thread pool executor (`AsyncConfig.java`), HTTP API responses return instantly while email sending occurs in the background.
+> **3. N+1 Query Elimination via `@EntityGraph`**
+> Primary repository query paths in `BookingRepository` and `PaymentRepository` use `@EntityGraph` to eagerly join related entities (`customer`, `service`, `provider`, `city`, `confirmedByAdmin`, `reversedByAdmin`) in a single SQL query, reducing query count overhead.
 
 ---
 
@@ -138,11 +144,11 @@ sequenceDiagram
 | Layer | Technology | Details |
 |---|---|---|
 | **Language** | Java 17 / JDK 25 | Standard JDK Features, Modern Syntax |
-| **Backend Framework** | Spring Boot 3.2.5 | Spring MVC, Spring Security, Spring Data JPA, Spring Async |
-| **Database** | MySQL 8.0 | InnoDB Engine, ACID Compliant Transactions |
-| **Schema Migration** | Flyway 10.x | Version-Controlled SQL Scripts |
+| **Backend Framework** | Spring Boot 3.2.5 | Spring MVC, Spring Security, Spring Data JPA, Spring Async, Actuator |
+| **Database & Sizing** | MySQL 8.0 + HikariCP | Explicit Pool Tuning (`max-pool: 10`, `min-idle: 5`, `leak-threshold: 30s`) |
+| **Schema Migration** | Flyway 10.x | Version-Controlled SQL Scripts (V1 through V8) |
 | **Email Engine** | JavaMailSender + Async | HTML Templates, Non-blocking Thread Pool |
-| **Frontend** | Vanilla HTML5 / CSS3 / ES6+ | Zero-Dependency Single Page Application with City Selector |
+| **Frontend** | Vanilla HTML5 / CSS3 / ES6+ | Zero-Dependency Single Page Application with City Selector & Hash Router |
 | **Containerization** | Docker & Docker Compose | Multi-container Orchestration |
 
 ---
@@ -153,6 +159,7 @@ sequenceDiagram
 | Method | Endpoint | Description | Auth Required |
 |---|---|---|---|
 | `GET` | `/api/health` | Database connection status & live record metrics | Public |
+| `GET` | `/actuator/health` | Spring Boot Actuator DB health status | Public |
 
 ### 📍 Cities & Service Discovery
 | Method | Endpoint | Description | Auth Required |
@@ -166,7 +173,8 @@ sequenceDiagram
 | Method | Endpoint | Description | Auth Required |
 |---|---|---|---|
 | `POST` | `/api/bookings` | Create new service booking | Public |
-| `POST` | `/api/payments` | Submit manual 12-digit UPI reference ID | Authenticated |
+| `POST` | `/api/payments` | Submit manual UPI reference ID (Auto-confirms immediately) | Public |
+| `GET` | `/api/bookings/me` | Customer booking history tracker (`?status=CONFIRMED&page=0`) | Public |
 | `GET` | `/api/bookings/customer` | Customer booking history (`?email=...`) | Public |
 | `GET` | `/api/bookings/provider` | Provider job assignments (`?email=...`) | Public |
 
@@ -176,9 +184,9 @@ sequenceDiagram
 | `GET` | `/api/admin/services` | List pending services for review (`?status=PENDING_REVIEW`) | `ROLE_ADMIN` |
 | `PUT` | `/api/admin/services/{id}/approve` | Approve service listing | `ROLE_ADMIN` |
 | `PUT` | `/api/admin/services/{id}/reject` | Reject service listing | `ROLE_ADMIN` |
-| `GET` | `/api/admin/payments` | List pending UPI payment references (`?status=PENDING`) | `ROLE_ADMIN` |
-| `POST` | `/api/admin/payments/{id}/confirm` | Confirm payment & unlock provider contact | `ROLE_ADMIN` |
-| `POST` | `/api/admin/payments/{id}/reject` | Reject payment reference with reason note | `ROLE_ADMIN` |
+| `GET` | `/api/admin/payments` | List all payment audit logs & references (`?status=AUTO_CONFIRMED`) | `ROLE_ADMIN` |
+| `POST` | `/api/admin/payments/{id}/confirm` | Manually confirm payment reference | `ROLE_ADMIN` |
+| `POST` | `/api/admin/payments/{id}/reverse` | Reverse auto-confirmed payment post-hoc with reason note | `ROLE_ADMIN` |
 | `POST` | `/api/admin/cities` | Add new operating city | `ROLE_ADMIN` |
 | `PUT` | `/api/admin/cities/{id}/toggle` | Toggle active status of a city | `ROLE_ADMIN` |
 
@@ -208,9 +216,9 @@ spring:
     password: ${MAIL_APP_PASSWORD:your_app_password}
 ```
 
-### 3️⃣ Build & Package
+### 3️⃣ Build & Run Tests
 ```bash
-mvn clean package -DskipTests
+mvn clean test
 ```
 
 ### 4️⃣ Launch Application
