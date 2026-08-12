@@ -3,13 +3,18 @@ spring:
     name: smart-service-marketplace
 
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/marketplace_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true}
+    url: ${DB_URL:jdbc:mysql://localhost:3306/marketplace_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true&connectTimeout=10000&socketTimeout=30000}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:Vishal@8696}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      connection-timeout: 30000
-      maximum-pool-size: 5
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 20000
+      pool-name: BookingPlatformPool
+      leak-detection-threshold: 30000
 
   jpa:
     hibernate:
@@ -62,3 +67,13 @@ logging:
   level:
     com.example.marketplace: INFO
     org.springframework.security: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  health:
+    db:
+      enabled: true
+

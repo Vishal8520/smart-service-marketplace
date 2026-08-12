@@ -14,17 +14,18 @@ import java.util.List;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
-    @EntityGraph(attributePaths = { "customer", "service", "service.category", "service.provider" })
+    @EntityGraph(attributePaths = { "customer", "service", "service.category", "service.provider", "service.city" })
     Page<Booking> findByCustomerIdOrderByCreatedAtDesc(Long customerId, Pageable pageable);
 
-    @EntityGraph(attributePaths = { "customer", "service", "service.category", "service.provider" })
+    @EntityGraph(attributePaths = { "customer", "service", "service.category", "service.provider", "service.city" })
     Page<Booking> findByCustomerIdAndStatusOrderByCreatedAtDesc(Long customerId, BookingStatus status,
             Pageable pageable);
 
-    @EntityGraph(attributePaths = { "customer", "service", "service.category", "service.provider" })
+    @EntityGraph(attributePaths = { "customer", "service", "service.category", "service.provider", "service.city" })
     @Query("SELECT b FROM Booking b WHERE b.service.provider.id = :providerId ORDER BY b.createdAt DESC")
     Page<Booking> findByServiceProviderIdOrderByCreatedAtDesc(@Param("providerId") Long providerId, Pageable pageable);
 
+    @EntityGraph(attributePaths = { "customer", "service", "service.category", "service.provider", "service.city" })
     List<Booking> findByCustomerIdAndStatus(Long customerId, BookingStatus status);
 
     boolean existsByCustomerIdAndServiceIdAndStatus(Long customerId, Long serviceId, BookingStatus status);

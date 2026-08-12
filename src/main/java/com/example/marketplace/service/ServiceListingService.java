@@ -4,6 +4,7 @@ import com.example.marketplace.dto.request.ServiceRequest;
 import com.example.marketplace.dto.response.ServiceResponse;
 import com.example.marketplace.entity.*;
 import com.example.marketplace.exception.ResourceNotFoundException;
+import com.example.marketplace.exception.UnauthorizedException;
 import com.example.marketplace.repository.CityRepository;
 import com.example.marketplace.repository.ReviewRepository;
 import com.example.marketplace.repository.ServiceListingRepository;
@@ -97,6 +98,11 @@ public class ServiceListingService {
     @Transactional
     public ServiceResponse updateService(Long id, ServiceRequest request, String providerEmail) {
         ServiceListing listing = getListingById(id);
+
+        if (listing.getProvider() != null && listing.getProvider().getEmail() != null
+                && !listing.getProvider().getEmail().equals(providerEmail)) {
+            throw new UnauthorizedException("You do not own this service listing");
+        }
 
         Category category = new Category();
         category.setId(request.getCategoryId());
