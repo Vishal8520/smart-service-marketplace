@@ -11,8 +11,8 @@ CREATE TABLE IF NOT EXISTS cities (
 
 -- ── Service Listings: add status + city_id ────────────────────
 ALTER TABLE service_listings
-    ADD COLUMN IF NOT EXISTS status  VARCHAR(20) NOT NULL DEFAULT 'APPROVED',
-    ADD COLUMN IF NOT EXISTS city_id BIGINT      DEFAULT NULL;
+    ADD COLUMN status  VARCHAR(20) NOT NULL DEFAULT 'APPROVED',
+    ADD COLUMN city_id BIGINT      DEFAULT NULL;
 
 ALTER TABLE service_listings
     ADD CONSTRAINT fk_sl_city FOREIGN KEY (city_id) REFERENCES cities(id) ON DELETE SET NULL;
@@ -21,18 +21,18 @@ ALTER TABLE service_listings
     ADD CONSTRAINT chk_service_status CHECK (status IN ('PENDING_REVIEW','APPROVED','REJECTED'));
 
 -- ── Redesign payments table for UPI reference-and-confirm flow ─
--- Drop old payment table (old gateway fields no longer applicable)
+-- Drop old payment constraints and gateway columns
 ALTER TABLE payments DROP FOREIGN KEY fk_py_booking;
 ALTER TABLE payments DROP INDEX uq_payments_booking;
 
 ALTER TABLE payments
-    DROP COLUMN IF EXISTS gateway_signature,
-    DROP COLUMN IF EXISTS gateway_order_id,
-    DROP COLUMN IF EXISTS gateway_payment_id,
-    ADD COLUMN IF NOT EXISTS upi_reference_id       VARCHAR(150) DEFAULT NULL COMMENT 'Unverified UPI reference string provided by customer — NOT the debited account',
-    ADD COLUMN IF NOT EXISTS confirmed_at            DATETIME(6)  DEFAULT NULL,
-    ADD COLUMN IF NOT EXISTS confirmed_by_admin_id   BIGINT       DEFAULT NULL,
-    ADD COLUMN IF NOT EXISTS notes                   VARCHAR(500) DEFAULT NULL COMMENT 'Admin remarks on manual payment verification';
+    DROP COLUMN gateway_signature,
+    DROP COLUMN gateway_order_id,
+    DROP COLUMN gateway_payment_id,
+    ADD COLUMN upi_reference_id       VARCHAR(150) DEFAULT NULL COMMENT 'Unverified UPI reference string provided by customer — NOT the debited account',
+    ADD COLUMN confirmed_at            DATETIME(6)  DEFAULT NULL,
+    ADD COLUMN confirmed_by_admin_id   BIGINT       DEFAULT NULL,
+    ADD COLUMN notes                   VARCHAR(500) DEFAULT NULL COMMENT 'Admin remarks on manual payment verification';
 
 -- Update payment status constraint to match new enum
 ALTER TABLE payments DROP CHECK chk_payment_status;
@@ -48,6 +48,6 @@ ALTER TABLE payments
     ADD CONSTRAINT fk_py_confirmed_by  FOREIGN KEY (confirmed_by_admin_id) REFERENCES users(id) ON DELETE SET NULL;
 
 -- ── New Indexes ─────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_service_listings_status ON service_listings(status);
-CREATE INDEX IF NOT EXISTS idx_service_listings_city   ON service_listings(city_id);
-CREATE INDEX IF NOT EXISTS idx_payments_status         ON payments(status);
+CREATE INDEX idx_service_listings_status ON service_listings(status);
+CREATE INDEX idx_service_listings_city   ON service_listings(city_id);
+CREATE INDEX idx_payments_status         ON payments(status);
