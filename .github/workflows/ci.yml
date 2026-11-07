@@ -1,4 +1,4 @@
-name: ServeNow CI
+name: ServeNow CI/CD Pipeline
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
     branches: [ main, master ]
 
 jobs:
-  build-and-test:
-    name: Build, Test & Package (JDK 21 LTS)
+  backend-ci:
+    name: Spring Boot (JDK 21 LTS) Build & Test
     runs-on: ubuntu-latest
 
     services:
@@ -34,8 +34,39 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build & Run Unit and Integration Tests
-        run: mvn clean verify -Dspring.profiles.active=dev -DDB_URL="jdbc:mysql://localhost:3306/marketplace_db?useSSL=false&allowPublicKeyRetrieval=true" -DDB_USERNAME=marketplace_user -DDB_PASSWORD=marketplace_pass
+      - name: Build & Run Unit and Service Tests
+        run: mvn clean test -Dspring.profiles.active=dev -DDB_URL="jdbc:mysql://localhost:3306/marketplace_db?useSSL=false&allowPublicKeyRetrieval=true" -DDB_USERNAME=marketplace_user -DDB_PASSWORD=marketplace_pass
 
-      - name: Build Docker Container
+      - name: Build Spring Boot Docker Image
         run: docker build -t smart-service-marketplace:${{ github.sha }} .
+
+  ai-service-ci:
+    name: AI Intelligence Microservice (Python 3.10)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: 'ai-service/requirements.txt'
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r ai-service/requirements.txt
+
+      - name: Run AI Microservice Unit Tests
+        run: |
+          PYTHONPATH=ai-service pytest ai-service/tests
+
+      - name: Run Automated Smoke Test Suite
+        run: |
+          python smoke_test.py
+
+      - name: Build AI Service Docker Image
+        run: docker build -t ai-service:${{ github.sha }} ./ai-service

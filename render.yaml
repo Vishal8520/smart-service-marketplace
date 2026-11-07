@@ -24,3 +24,27 @@ services:
         value: rzp_test_placeholder
       - key: RAZORPAY_KEY_SECRET
         value: placeholder_secret
+      - key: AI_SERVICE_URL
+        fromService:
+          type: web
+          name: ai-service
+          property: host
+      - key: AI_SERVICE_API_KEY
+        value: servenow-internal-ai-key-secret-2026
+
+  - type: web
+    name: ai-service
+    env: docker
+    dockerContext: ./ai-service
+    dockerfilePath: ./ai-service/Dockerfile
+    plan: free
+    region: singapore
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: AI_SERVICE_API_KEY
+        value: servenow-internal-ai-key-secret-2026
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ENVIRONMENT
+        value: production
