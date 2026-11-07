@@ -12,4 +12,19 @@ public interface PaymentAuditLogRepository extends JpaRepository<PaymentAuditLog
     List<PaymentAuditLog> findByPaymentIdOrderByCreatedAtDesc(Long paymentId);
 
     Page<PaymentAuditLog> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    @Override
+    default void delete(PaymentAuditLog entity) {
+        throw new UnsupportedOperationException("PaymentAuditLog records are immutable and cannot be deleted");
+    }
+
+    @Override
+    default void deleteById(Long id) {
+        throw new UnsupportedOperationException("PaymentAuditLog records are immutable and cannot be deleted");
+    }
+
+    @Override
+    default void deleteAll() {
+        throw new UnsupportedOperationException("PaymentAuditLog records are immutable and cannot be deleted");
+    }
 }

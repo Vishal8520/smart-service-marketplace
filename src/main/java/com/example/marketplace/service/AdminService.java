@@ -5,11 +5,7 @@ import com.example.marketplace.dto.request.PaymentRejectRequest;
 import com.example.marketplace.dto.response.AdminAnalyticsResponse;
 import com.example.marketplace.dto.response.PaymentResponse;
 import com.example.marketplace.dto.response.ServiceResponse;
-import com.example.marketplace.entity.BookingStatus;
-import com.example.marketplace.entity.PaymentStatus;
-import com.example.marketplace.entity.RoleType;
-import com.example.marketplace.entity.ServiceListing;
-import com.example.marketplace.entity.ServiceStatus;
+import com.example.marketplace.entity.*;
 import com.example.marketplace.exception.ResourceNotFoundException;
 import com.example.marketplace.repository.*;
 import org.springframework.data.domain.Page;
@@ -31,9 +27,9 @@ public class AdminService {
     private final ServiceListingService serviceListingService;
 
     public AdminService(UserRepository userRepository, ServiceListingRepository serviceListingRepository,
-            BookingRepository bookingRepository, ReviewRepository reviewRepository,
-            PaymentRepository paymentRepository, PaymentService paymentService,
-            ServiceListingService serviceListingService) {
+                        BookingRepository bookingRepository, ReviewRepository reviewRepository,
+                        PaymentRepository paymentRepository, PaymentService paymentService,
+                        ServiceListingService serviceListingService) {
         this.userRepository = userRepository;
         this.serviceListingRepository = serviceListingRepository;
         this.bookingRepository = bookingRepository;
@@ -86,6 +82,10 @@ public class AdminService {
     @Transactional
     public ServiceResponse approveService(Long id) {
         ServiceListing service = getServiceById(id);
+        if (service.getProvider() != null && service.getProvider().getKycStatus() != KycStatus.APPROVED) {
+            throw new IllegalStateException("Cannot approve service: Provider " + service.getProvider().getName()
+                    + " has not been KYC-approved yet (status: " + service.getProvider().getKycStatus() + ")");
+        }
         service.setStatus(ServiceStatus.APPROVED);
         service.setActive(true);
         return serviceListingService.toResponse(serviceListingRepository.save(service));
@@ -102,9 +102,39 @@ public class AdminService {
     @Transactional
     public ServiceResponse toggleServiceActive(Long id) {
         ServiceListing service = getServiceById(id);
+        if (!service.isActive() && service.getProvider() != null && service.getProvider().getKycStatus() != KycStatus.APPROVED) {
+            throw new IllegalStateException("Cannot activate service: Provider KYC status is " + service.getProvider().getKycStatus());
+        }
         service.setActive(!service.isActive());
         return serviceListingService.toResponse(serviceListingRepository.save(service));
     }
+
+    // --- Provider KYC Verification ---
+
+    @Transactional(readOnly = true)
+    public Page<User> getProvidersByKycStatus(KycStatus status, Pageable pageable) {
+        return userRepository.findByRoleAndKycStatus(RoleType.SERVICE_PROVIDER, status, pageable);
+    }
+
+    @Transactional
+    public User approveProviderKyc(Long providerId) {
+        User user = userRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", providerId));
+        user.setKycStatus(KycStatus.APPROVED);
+        user.setKycNotes("KYC Approved by Admin");
+        return userRepository.save(user);
+    }
+
+    @Transactional
+    public User rejectProviderKyc(Long providerId, String reason) {
+        User user = userRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", providerId));
+        user.setKycStatus(KycStatus.REJECTED);
+        user.setKycNotes(reason != null ? reason : "KYC Rejected by Admin");
+        return userRepository.save(user);
+    }
+
+    // --- Payments ---
 
     @Transactional(readOnly = true)
     public Page<PaymentResponse> getPaymentsByStatus(PaymentStatus status, Pageable pageable) {
@@ -122,8 +152,8 @@ public class AdminService {
     }
 
     @Transactional
-    public PaymentResponse rejectPayment(Long paymentId, PaymentRejectRequest request) {
-        return paymentService.rejectPayment(paymentId, request);
+    public PaymentResponse rejectPayment(Long paymentId, PaymentRejectRequest request, String adminEmail) {
+        return paymentService.rejectPayment(paymentId, request, adminEmail);
     }
 
     private ServiceListing getServiceById(Long id) {

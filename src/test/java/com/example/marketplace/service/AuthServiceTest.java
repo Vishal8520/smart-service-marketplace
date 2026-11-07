@@ -1,12 +1,17 @@
 package com.example.marketplace.service;
 
 import com.example.marketplace.dto.request.LoginRequest;
+import com.example.marketplace.dto.request.RefreshTokenRequest;
 import com.example.marketplace.dto.request.RegisterRequest;
 import com.example.marketplace.dto.response.AuthResponse;
+import com.example.marketplace.entity.RefreshToken;
 import com.example.marketplace.entity.RoleType;
 import com.example.marketplace.entity.User;
+import com.example.marketplace.exception.RateLimitExceededException;
+import com.example.marketplace.repository.RefreshTokenRepository;
 import com.example.marketplace.repository.UserRepository;
 import com.example.marketplace.security.JwtService;
+import com.example.marketplace.security.RateLimitingService;
 import com.example.marketplace.security.UserDetailsServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,9 +21,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,6 +40,8 @@ class AuthServiceTest {
     @Mock
     private UserRepository userRepository;
     @Mock
+    private RefreshTokenRepository refreshTokenRepository;
+    @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
     private JwtService jwtService;
@@ -39,6 +49,8 @@ class AuthServiceTest {
     private AuthenticationManager authenticationManager;
     @Mock
     private UserDetailsServiceImpl userDetailsService;
+    @Mock
+    private RateLimitingService rateLimitingService;
 
     @InjectMocks
     private AuthService authService;
@@ -53,12 +65,12 @@ class AuthServiceTest {
         registerRequest = new RegisterRequest();
         registerRequest.setName("Jane Provider");
         registerRequest.setEmail("jane@example.com");
-        registerRequest.setPassword("password123");
+        registerRequest.setPassword("Password123!");
         registerRequest.setRole("SERVICE_PROVIDER");
 
         loginRequest = new LoginRequest();
         loginRequest.setEmail("jane@example.com");
-        loginRequest.setPassword("password123");
+        loginRequest.setPassword("Password123!");
 
         user = User.builder()
                 .id(1L)
@@ -66,6 +78,7 @@ class AuthServiceTest {
                 .email("jane@example.com")
                 .password("hashed_password")
                 .role(RoleType.SERVICE_PROVIDER)
+                .failedLoginAttempts(0)
                 .build();
 
         userDetails = org.springframework.security.core.userdetails.User
@@ -92,6 +105,7 @@ class AuthServiceTest {
         assertThat(response.getRefreshToken()).isEqualTo("refresh_jwt");
         assertThat(response.getRole()).isEqualTo("SERVICE_PROVIDER");
         verify(userRepository, times(1)).save(any());
+        verify(refreshTokenRepository, times(1)).save(any());
     }
 
     @Test
@@ -107,6 +121,7 @@ class AuthServiceTest {
     @Test
     @DisplayName("Should successfully authenticate user and return tokens")
     void login_Success() {
+        when(rateLimitingService.tryConsumeLogin(any())).thenReturn(true);
         when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(user));
         when(userDetailsService.loadUserByUsername(loginRequest.getEmail())).thenReturn(userDetails);
         when(jwtService.generateAccessToken(any())).thenReturn("access_jwt");
@@ -117,5 +132,63 @@ class AuthServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.getAccessToken()).isEqualTo("access_jwt");
         verify(authenticationManager, times(1)).authenticate(any());
+        verify(refreshTokenRepository, times(1)).save(any());
+    }
+
+    @Test
+    @DisplayName("Should throw RateLimitExceededException when rate limit is exceeded")
+    void login_RateLimitExceeded_Throws() {
+        when(rateLimitingService.tryConsumeLogin(any())).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(loginRequest))
+                .isInstanceOf(RateLimitExceededException.class)
+                .hasMessageContaining("Too many login attempts");
+    }
+
+    @Test
+    @DisplayName("Should throw LockedException when user account is locked")
+    void login_AccountLocked_Throws() {
+        User lockedUser = User.builder()
+                .id(2L)
+                .email("jane@example.com")
+                .accountLockedUntil(Instant.now().plusSeconds(600))
+                .build();
+
+        when(rateLimitingService.tryConsumeLogin(any())).thenReturn(true);
+        when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(lockedUser));
+
+        assertThatThrownBy(() -> authService.login(loginRequest))
+                .isInstanceOf(LockedException.class)
+                .hasMessageContaining("Account is temporarily locked");
+    }
+
+    @Test
+    @DisplayName("Should rotate refresh tokens and return new pair")
+    void refresh_Success_RotatesTokens() {
+        String oldRefreshToken = "old_refresh_token";
+        RefreshToken storedToken = RefreshToken.builder()
+                .id(10L)
+                .user(user)
+                .tokenHash("some_hash")
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .revoked(false)
+                .build();
+
+        when(jwtService.extractUsername(oldRefreshToken)).thenReturn(user.getEmail());
+        when(userDetailsService.loadUserByUsername(user.getEmail())).thenReturn(userDetails);
+        when(jwtService.isTokenValid(oldRefreshToken, userDetails)).thenReturn(true);
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(storedToken));
+        when(jwtService.generateAccessToken(userDetails)).thenReturn("new_access_token");
+        when(jwtService.generateRefreshToken(userDetails)).thenReturn("new_refresh_token");
+
+        RefreshTokenRequest request = new RefreshTokenRequest(oldRefreshToken);
+        AuthResponse response = authService.refresh(request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getAccessToken()).isEqualTo("new_access_token");
+        assertThat(response.getRefreshToken()).isEqualTo("new_refresh_token");
+        assertThat(storedToken.isRevoked()).isTrue();
+        verify(refreshTokenRepository, times(2)).save(any());
     }
 }

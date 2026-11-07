@@ -17,6 +17,14 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             "confirmedByAdmin", "reversedByAdmin" })
     Optional<Payment> findByBookingId(Long bookingId);
 
+    Optional<Payment> findByUpiReferenceId(String upiReferenceId);
+
+    Optional<Payment> findByIdempotencyKey(String idempotencyKey);
+
+    boolean existsByUpiReferenceId(String upiReferenceId);
+
+    boolean existsByIdempotencyKey(String idempotencyKey);
+
     @EntityGraph(attributePaths = { "booking", "booking.customer", "booking.service", "booking.service.provider",
             "confirmedByAdmin", "reversedByAdmin" })
     Page<Payment> findAllByStatus(PaymentStatus status, Pageable pageable);
@@ -26,6 +34,6 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             "confirmedByAdmin", "reversedByAdmin" })
     Page<Payment> findAll(Pageable pageable);
 
-    @Query("SELECT SUM(p.amount) FROM Payment p WHERE p.status = 'CONFIRMED' OR p.status = 'AUTO_CONFIRMED'")
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p WHERE p.status = 'CONFIRMED' OR p.status = 'AUTO_CONFIRMED' OR p.status = 'VERIFIED'")
     BigDecimal calculateTotalPlatformRevenue();
 }

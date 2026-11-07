@@ -15,17 +15,17 @@ public class ServiceListing {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 150)
+    @Column(nullable = false, length = 200)
     private String title;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", nullable = false)
+    @JoinColumn(name = "category_id")
     private Category category;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -37,7 +37,7 @@ public class ServiceListing {
     private City city;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20, columnDefinition = "VARCHAR(20)")
+    @Column(nullable = false, length = 20)
     private ServiceStatus status = ServiceStatus.APPROVED;
 
     @ElementCollection
@@ -47,6 +47,9 @@ public class ServiceListing {
 
     @Column(name = "average_rating")
     private Double averageRating = 0.0;
+
+    @Column(name = "review_count", nullable = false)
+    private int reviewCount = 0;
 
     @Column(nullable = false)
     private boolean active = true;
@@ -58,9 +61,9 @@ public class ServiceListing {
     public ServiceListing() {
     }
 
-    public ServiceListing(Long id, String title, String description, BigDecimal price, Category category, User provider,
-            City city, ServiceStatus status, List<String> tags, Double averageRating, boolean active,
-            Instant createdAt) {
+    public ServiceListing(Long id, String title, String description, BigDecimal price, Category category,
+                          User provider, City city, ServiceStatus status, List<String> tags, Double averageRating,
+                          int reviewCount, boolean active, Instant createdAt) {
         this.id = id;
         this.title = title;
         this.description = description;
@@ -71,6 +74,7 @@ public class ServiceListing {
         this.status = status != null ? status : ServiceStatus.APPROVED;
         this.tags = tags;
         this.averageRating = averageRating != null ? averageRating : 0.0;
+        this.reviewCount = reviewCount;
         this.active = active;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
     }
@@ -90,6 +94,7 @@ public class ServiceListing {
         private ServiceStatus status = ServiceStatus.APPROVED;
         private List<String> tags;
         private Double averageRating = 0.0;
+        private int reviewCount = 0;
         private boolean active = true;
         private Instant createdAt;
 
@@ -143,6 +148,11 @@ public class ServiceListing {
             return this;
         }
 
+        public Builder reviewCount(int reviewCount) {
+            this.reviewCount = reviewCount;
+            return this;
+        }
+
         public Builder active(boolean active) {
             this.active = active;
             return this;
@@ -155,7 +165,7 @@ public class ServiceListing {
 
         public ServiceListing build() {
             return new ServiceListing(id, title, description, price, category, provider, city, status, tags,
-                    averageRating, active, createdAt);
+                    averageRating, reviewCount, active, createdAt);
         }
     }
 
@@ -237,6 +247,14 @@ public class ServiceListing {
 
     public void setAverageRating(Double averageRating) {
         this.averageRating = averageRating;
+    }
+
+    public int getReviewCount() {
+        return reviewCount;
+    }
+
+    public void setReviewCount(int reviewCount) {
+        this.reviewCount = reviewCount;
     }
 
     public boolean isActive() {

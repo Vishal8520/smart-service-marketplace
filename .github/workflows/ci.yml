@@ -1,0 +1,41 @@
+name: ServeNow CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    name: Build, Test & Package (JDK 21 LTS)
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: marketplace_db
+          MYSQL_USER: marketplace_user
+          MYSQL_PASSWORD: marketplace_pass
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 LTS
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build & Run Unit and Integration Tests
+        run: mvn clean verify -Dspring.profiles.active=dev -DDB_URL="jdbc:mysql://localhost:3306/marketplace_db?useSSL=false&allowPublicKeyRetrieval=true" -DDB_USERNAME=marketplace_user -DDB_PASSWORD=marketplace_pass
+
+      - name: Build Docker Container
+        run: docker build -t smart-service-marketplace:${{ github.sha }} .

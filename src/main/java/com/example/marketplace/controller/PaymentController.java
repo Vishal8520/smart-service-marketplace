@@ -23,10 +23,15 @@ public class PaymentController {
     }
 
     @PostMapping
-    @Operation(summary = "Submit manual UPI reference ID for a booking")
+    @Operation(summary = "Submit manual UPI reference ID (12-digit UTR) for a booking with idempotency key")
     public ResponseEntity<PaymentResponse> createPaymentReference(
             @Valid @RequestBody PaymentRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKeyHeader,
             Authentication authentication) {
+        if (idempotencyKeyHeader != null && !idempotencyKeyHeader.isBlank() && (request.getIdempotencyKey() == null || request.getIdempotencyKey().isBlank())) {
+            request.setIdempotencyKey(idempotencyKeyHeader.trim());
+        }
+
         String currentUserEmail = (authentication != null && authentication.getName() != null)
                 ? authentication.getName()
                 : "customer.guest@marketplace.com";
@@ -37,13 +42,19 @@ public class PaymentController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get payment reference details by Payment ID")
-    public ResponseEntity<PaymentResponse> getPaymentById(@PathVariable Long id) {
-        return ResponseEntity.ok(paymentService.getPaymentById(id));
+    public ResponseEntity<PaymentResponse> getPaymentById(
+            @PathVariable Long id,
+            Authentication authentication) {
+        String currentUserEmail = authentication != null ? authentication.getName() : null;
+        return ResponseEntity.ok(paymentService.getPaymentById(id, currentUserEmail));
     }
 
     @GetMapping("/booking/{bookingId}")
     @Operation(summary = "Get payment reference details by Booking ID")
-    public ResponseEntity<PaymentResponse> getPaymentByBookingId(@PathVariable Long bookingId) {
-        return ResponseEntity.ok(paymentService.getPaymentByBookingId(bookingId));
+    public ResponseEntity<PaymentResponse> getPaymentByBookingId(
+            @PathVariable Long bookingId,
+            Authentication authentication) {
+        String currentUserEmail = authentication != null ? authentication.getName() : null;
+        return ResponseEntity.ok(paymentService.getPaymentByBookingId(bookingId, currentUserEmail));
     }
 }

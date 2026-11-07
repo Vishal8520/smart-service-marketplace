@@ -15,3 +15,13 @@ TestDB.java
 node_modules/
 dist/
 .env
+
+# Python & Pytest
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.env
+.venv/
+env/
+venv/

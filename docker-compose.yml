@@ -5,16 +5,16 @@ services:
     image: mysql:8.0
     container_name: marketplace_mysql
     environment:
-      MYSQL_DATABASE: marketplace_db
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_USER: marketplace_user
-      MYSQL_PASSWORD: marketplace_pass
+      MYSQL_DATABASE: ${DB_NAME:-marketplace_db}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_USER: ${DB_USERNAME:-marketplace_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-marketplace_pass}
     volumes:
       - mysql_data:/var/lib/mysql
     ports:
       - "3306:3306"
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword" ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,6 +25,31 @@ services:
     ports:
       - "1025:1025" # SMTP
       - "8025:8025" # Web UI
+    healthcheck:
+      test: [ "CMD-SHELL", "nc -z localhost 1025 || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: marketplace_ai_service
+    environment:
+      AI_SERVICE_API_KEY: ${AI_SERVICE_API_KEY:-servenow-internal-ai-key-secret-2026}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-3-haiku-20240307}
+      ENVIRONMENT: production
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8000/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: on-failure
 
   app:
     build:
@@ -34,16 +59,29 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      mailhog:
+        condition: service_started
+      ai-service:
+        condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: dev
-      DB_URL: jdbc:mysql://mysql:3306/marketplace_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
-      DB_USERNAME: marketplace_user
-      DB_PASSWORD: marketplace_pass
+      DB_URL: jdbc:mysql://mysql:3306/${DB_NAME:-marketplace_db}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+      DB_USERNAME: ${DB_USERNAME:-marketplace_user}
+      DB_PASSWORD: ${DB_PASSWORD:-marketplace_pass}
       MAIL_HOST: mailhog
       MAIL_PORT: 1025
-      JWT_SECRET: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8081,http://127.0.0.1:8081}
+      AI_SERVICE_URL: http://ai-service:8000
+      AI_SERVICE_API_KEY: ${AI_SERVICE_API_KEY:-servenow-internal-ai-key-secret-2026}
     ports:
       - "8081:8081"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8081/actuator/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 35s
     restart: on-failure
 
 volumes:

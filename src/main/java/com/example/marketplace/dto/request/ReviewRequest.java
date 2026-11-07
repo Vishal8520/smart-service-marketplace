@@ -21,6 +21,12 @@ public class ReviewRequest {
     public ReviewRequest() {
     }
 
+    public ReviewRequest(Long bookingId, Integer rating, String comment) {
+        this.bookingId = bookingId;
+        this.rating = rating;
+        this.comment = comment;
+    }
+
     public Long getBookingId() {
         return bookingId;
     }

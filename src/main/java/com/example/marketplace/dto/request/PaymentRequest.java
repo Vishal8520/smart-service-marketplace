@@ -3,6 +3,7 @@ package com.example.marketplace.dto.request;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 public class PaymentRequest {
 
@@ -10,8 +11,11 @@ public class PaymentRequest {
     private Long bookingId;
 
     @NotBlank(message = "UPI Reference ID is required")
-    @Pattern(regexp = "^[a-zA-Z0-9.\\-_@]{6,100}$", message = "Please enter a valid UPI transaction reference string (6-100 characters)")
+    @Pattern(regexp = "^[0-9]{12}$", message = "UPI Reference ID must be a valid 12-digit UTR number")
     private String upiReferenceId;
+
+    @Size(max = 100, message = "Idempotency key must not exceed 100 characters")
+    private String idempotencyKey;
 
     public PaymentRequest() {
     }
@@ -19,6 +23,12 @@ public class PaymentRequest {
     public PaymentRequest(Long bookingId, String upiReferenceId) {
         this.bookingId = bookingId;
         this.upiReferenceId = upiReferenceId;
+    }
+
+    public PaymentRequest(Long bookingId, String upiReferenceId, String idempotencyKey) {
+        this.bookingId = bookingId;
+        this.upiReferenceId = upiReferenceId;
+        this.idempotencyKey = idempotencyKey;
     }
 
     public Long getBookingId() {
@@ -35,5 +45,13 @@ public class PaymentRequest {
 
     public void setUpiReferenceId(String upiReferenceId) {
         this.upiReferenceId = upiReferenceId;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
     }
 }

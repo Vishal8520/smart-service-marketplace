@@ -9,24 +9,25 @@ public class PaymentAuditLog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(updatable = false)
     private Long id;
 
-    @Column(name = "payment_id", nullable = false)
+    @Column(name = "payment_id", nullable = false, updatable = false)
     private Long paymentId;
 
-    @Column(name = "from_status", length = 50)
+    @Column(name = "from_status", length = 50, updatable = false)
     private String fromStatus;
 
-    @Column(name = "to_status", nullable = false, length = 50)
+    @Column(name = "to_status", nullable = false, length = 50, updatable = false)
     private String toStatus;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = 100, updatable = false)
     private String action;
 
-    @Column(name = "actor_email", nullable = false)
+    @Column(name = "actor_email", nullable = false, updatable = false)
     private String actorEmail;
 
-    @Column(length = 500)
+    @Column(length = 500, updatable = false)
     private String notes;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -110,63 +111,31 @@ public class PaymentAuditLog {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
     public Long getPaymentId() {
         return paymentId;
-    }
-
-    public void setPaymentId(Long paymentId) {
-        this.paymentId = paymentId;
     }
 
     public String getFromStatus() {
         return fromStatus;
     }
 
-    public void setFromStatus(String fromStatus) {
-        this.fromStatus = fromStatus;
-    }
-
     public String getToStatus() {
         return toStatus;
-    }
-
-    public void setToStatus(String toStatus) {
-        this.toStatus = toStatus;
     }
 
     public String getAction() {
         return action;
     }
 
-    public void setAction(String action) {
-        this.action = action;
-    }
-
     public String getActorEmail() {
         return actorEmail;
-    }
-
-    public void setActorEmail(String actorEmail) {
-        this.actorEmail = actorEmail;
     }
 
     public String getNotes() {
         return notes;
     }
 
-    public void setNotes(String notes) {
-        this.notes = notes;
-    }
-
     public Instant getCreatedAt() {
         return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
     }
 }

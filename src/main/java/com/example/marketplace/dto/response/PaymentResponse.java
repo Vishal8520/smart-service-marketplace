@@ -14,6 +14,7 @@ public class PaymentResponse {
     private String currency;
     private PaymentStatus status;
     private String upiReferenceId;
+    private String idempotencyKey;
     private Instant confirmedAt;
     private Long confirmedByAdminId;
     private boolean autoConfirmed;
@@ -27,7 +28,7 @@ public class PaymentResponse {
     }
 
     public PaymentResponse(Long id, Long bookingId, String customerName, BigDecimal amount, String currency,
-            PaymentStatus status, String upiReferenceId, Instant confirmedAt, Long confirmedByAdminId,
+            PaymentStatus status, String upiReferenceId, String idempotencyKey, Instant confirmedAt, Long confirmedByAdminId,
             boolean autoConfirmed, Instant reversedAt, Long reversedByAdminId, String reversalReason, String notes,
             Instant createdAt) {
         this.id = id;
@@ -37,6 +38,7 @@ public class PaymentResponse {
         this.currency = currency;
         this.status = status;
         this.upiReferenceId = upiReferenceId;
+        this.idempotencyKey = idempotencyKey;
         this.confirmedAt = confirmedAt;
         this.confirmedByAdminId = confirmedByAdminId;
         this.autoConfirmed = autoConfirmed;
@@ -59,9 +61,10 @@ public class PaymentResponse {
         private String currency;
         private PaymentStatus status;
         private String upiReferenceId;
+        private String idempotencyKey;
         private Instant confirmedAt;
         private Long confirmedByAdminId;
-        private boolean autoConfirmed = true;
+        private boolean autoConfirmed = false;
         private Instant reversedAt;
         private Long reversedByAdminId;
         private String reversalReason;
@@ -100,6 +103,11 @@ public class PaymentResponse {
 
         public Builder upiReferenceId(String upiReferenceId) {
             this.upiReferenceId = upiReferenceId;
+            return this;
+        }
+
+        public Builder idempotencyKey(String idempotencyKey) {
+            this.idempotencyKey = idempotencyKey;
             return this;
         }
 
@@ -145,7 +153,7 @@ public class PaymentResponse {
 
         public PaymentResponse build() {
             return new PaymentResponse(id, bookingId, customerName, amount, currency, status, upiReferenceId,
-                    confirmedAt, confirmedByAdminId, autoConfirmed, reversedAt, reversedByAdminId, reversalReason,
+                    idempotencyKey, confirmedAt, confirmedByAdminId, autoConfirmed, reversedAt, reversedByAdminId, reversalReason,
                     notes, createdAt);
         }
     }
@@ -204,6 +212,14 @@ public class PaymentResponse {
 
     public void setUpiReferenceId(String upiReferenceId) {
         this.upiReferenceId = upiReferenceId;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
     }
 
     public Instant getConfirmedAt() {

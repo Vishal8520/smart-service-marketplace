@@ -1,0 +1,208 @@
+================================================================================
+                     SERVENOW - SMART SERVICE MARKETPLACE
+                       PROJECT OVERVIEW & TECHNICAL GUIDE
+================================================================================
+
+Hi there! This document provides a complete, easy-to-read overview of the 
+ServeNow Smart Service Marketplace project. Whether you are reviewing this 
+for presentation, onboard testing, technical interview prep, or project 
+documentation, here is everything you need to know about why we built it, 
+how it's structured, the tech stack used, the real-world problems we solved, 
+and how those challenges were resolved.
+
+--------------------------------------------------------------------------------
+1. PURPOSE OF THIS PROJECT
+--------------------------------------------------------------------------------
+ServeNow is an enterprise-grade, multi-city on-demand service marketplace 
+platform designed to connect everyday consumers (customers) with verified 
+local service professionals (plumbers, electricians, tutors, web developers, 
+cleaners, carpenters, and pest control specialists).
+
+Main Goals:
+- City-Based Discovery: Allow users to select their specific city and browse 
+  locally available, approved services.
+- Seamless Booking & Auto-Approved UPI Payments: Provide a zero-friction demo 
+  experience where customers can select a service, book an appointment, and 
+  submit a UPI reference code that auto-confirms payment instantly while 
+  unlocking provider contact details.
+- Post-Hoc Admin Safety & Auditability: Ensure platform integrity by giving 
+  administrators full audit logs of payment events and the ability to reverse 
+  suspicious transactions post-hoc without breaking data constraints.
+- Non-Blocking Communication: Keep user HTTP interactions fast by handling 
+  all transactional email notifications (booking confirmation, payment alerts, 
+  reversal notices) asynchronously in the background.
+
+--------------------------------------------------------------------------------
+2. PROJECT STRUCTURE
+--------------------------------------------------------------------------------
+The project follows a standard, clean Spring Boot architecture paired with a 
+lightweight single-page frontend:
+
+smart-service-marketplace/
+├── src/main/java/com/example/marketplace/
+│   ├── MarketplaceApplication.java   # Main Spring Boot Application Entrypoint
+│   ├── config/                        # Configuration Classes
+│   │   ├── AsyncConfig.java           # Custom ThreadPoolTaskExecutor for async emails
+│   │   ├── CorsConfig.java            # Cross-Origin Resource Sharing setup
+│   │   ├── FlywayConfig.java          # Database migration launcher & fallback tuning
+│   │   ├── JwtConfig.java             # JWT token secret & expiration settings
+│   │   ├── SecurityConfig.java        # Spring Security request filter chain & roles
+│   │   └── SwaggerConfig.java         # OpenAPI / Swagger documentation setup
+│   ├── controller/                    # REST API Endpoints
+│   │   ├── AdminController.java       # Admin actions (service approval, payment audit/reversal, city management)
+│   │   ├── AuthController.java        # User registration, login, token refresh
+│   │   ├── BookingController.java     # Booking creation, tracking, customer/provider history
+│   │   ├── CityController.java        # Active cities listing & management
+│   │   ├── HealthController.java      # Application & database diagnostic endpoints
+│   │   ├── PaymentController.java     # Payment submission & lookup
+│   │   └── ServiceController.java     # Service listing discovery & creation
+│   ├── dto/                           # Data Transfer Objects
+│   │   ├── request/                   # Incoming payload formats (Login, Booking, Payment, Service)
+│   │   └── response/                  # Outgoing JSON API response structures
+│   ├── entity/                        # JPA Database Domain Entities
+│   │   ├── User.java, RoleType.java   # Users & role management (ADMIN, CUSTOMER, PROVIDER)
+│   │   ├── ServiceListing.java        # Service details, category, city, pricing, approval status
+│   │   ├── Booking.java               # Booking record connecting Customer, Service, Status
+│   │   ├── Payment.java               # Payment records, reference code, status
+│   │   ├── PaymentAuditLog.java       # Immutable log of payment status transitions
+│   │   └── City.java                  # Platform operating cities
+│   ├── exception/                     # Global Exception Handling
+│   │   ├── GlobalExceptionHandler.java# Centralized RFC-7807 formatted API error responses
+│   │   └── ResourceNotFoundException.java # Custom exceptions
+│   ├── port/                          # Architectural Interfaces / Ports
+│   │   └── PaymentGatewayPort.java    # Gateway abstraction interface & stub implementation
+│   ├── repository/                    # Spring Data JPA Repositories
+│   │   ├── BookingRepository.java     # Optimized with @EntityGraph queries
+│   │   ├── PaymentRepository.java     # Optimized fetching for payments & audit logs
+│   │   ├── ServiceListingRepository.java # Multi-criteria city & keyword filters
+│   │   └── UserRepository.java        # User lookup & security persistence
+│   ├── security/                      # Stateless JWT Security Infrastructure
+│   │   ├── JwtTokenProvider.java      # JWT generation, validation, claims parsing
+│   │   └── JwtAuthenticationFilter.java # Per-request authorization header filter
+│   └── service/                       # Encapsulated Business Logic Layer
+│       ├── AdminService.java          # Admin operations, audit logging, reversal logic
+│       ├── AuthService.java           # Authentication, password hashing, JWT issue
+│       ├── BookingService.java        # Booking workflow & status transitions
+│       ├── CityService.java           # Operating cities logic
+│       ├── EmailService.java          # HTML email composition & async dispatch
+│       ├── PaymentService.java        # UPI auto-confirmation & payment processing
+│       └── ServiceListingService.java # Service listing creation & city filtering
+├── src/main/resources/
+│   ├── db/migration/                  # Versioned Flyway Database SQL Migrations
+│   │   ├── V1__init_schema.sql        # Initial database schema setup
+│   │   ├── V2__seed_data.sql          # Default users, categories, services seed data
+│   │   ├── V3__add_average_rating_and_tags.sql
+│   │   ├── V4__add_city_status_payment_upi.sql
+│   │   ├── V5__update_admin_and_seed_cities.sql
+│   │   ├── V6__add_booking_customer_id_index.sql
+│   │   ├── V7__add_auto_confirm_and_audit_log.sql
+│   │   └── V8__database_indexes_and_constraints.sql # Hardened composite indexes & explicit PKs
+│   ├── static/                        # Frontend Web Assets
+│   │   └── index.html                 # Single-Page Application UI (HTML/CSS/JS)
+│   └── application.yml                # Configuration (Database, HikariCP, Mail, Security, Actuator)
+├── Dockerfile                         # Container build instructions for Spring Boot app
+├── docker-compose.yml                 # Orchestration for MySQL 8.0, MailHog, and Application
+├── render.yaml                        # Cloud deployment spec for Render platform
+└── pom.xml                            # Maven project dependencies and build plugins
+
+--------------------------------------------------------------------------------
+3. TECH STACK & WHERE EACH TECHNOLOGY IS USED
+--------------------------------------------------------------------------------
+Here is a breakdown of all the tools and frameworks powering ServeNow:
+
+- Java 21 LTS:
+  Used as the primary programming language for the entire backend application, 
+  including core logic, data structures, and APIs.
+
+- Spring Boot 3.2.5:
+  The core foundation framework. Specifically using:
+  - Spring Web: To construct RESTful HTTP API controllers.
+  - Spring Security: To enforce role-based access control (ROLE_ADMIN, ROLE_CUSTOMER, ROLE_PROVIDER).
+  - Spring Data JPA: To map Java objects directly to MySQL tables and handle queries.
+  - Spring Validation: To validate incoming JSON DTO requests (@NotNull, @Email, etc.).
+  - Spring Mail: To format and send transactional notifications via SMTP.
+  - Spring Actuator: For application health monitoring and diagnostic endpoints (/actuator/health).
+
+- MySQL 8.0 + HikariCP Connection Pool:
+  Used as the relational database storage. Managed via HikariCP high-performance 
+  connection pooling with tuned parameters (max pool size 10, minimum idle 5, 
+  leak-detection threshold 30s) to prevent connection leaks.
+
+- Flyway Database Migration (v10.11.0):
+  Used in db/migration/ to automatically manage database schema creation and updates 
+  (V1 through V8). Ensures smooth transitions across development, testing, and 
+  cloud deployments.
+
+- JJWT (io.jsonwebtoken 0.12.5):
+  Used in security/ for generating, signing, and parsing stateless JSON Web Tokens (JWT) 
+  for secure user sessions.
+
+- Asynchronous Execution (@EnableAsync + ThreadPoolTaskExecutor):
+  Used in config/AsyncConfig.java and service/EmailService.java to send rich HTML email 
+  alerts in background threads without slowing down user API requests.
+
+- OpenAPI 3.0 / SpringDoc Swagger (2.5.0):
+  Used to dynamically generate interactive API documentation available at /swagger-ui.html.
+
+- Frontend (Vanilla HTML5 / CSS3 / ES6 JavaScript):
+  Located in src/main/resources/static/index.html. Provides a zero-dependency, fast, 
+  Amazon-inspired single-page UI with dynamic hash routing, city selector header, 
+  category filtering, and interactive booking tracking.
+
+- Docker & Docker Compose:
+  Used to orchestrate multi-container setups combining MySQL 8.0, MailHog SMTP mock server, 
+  and the Spring Boot backend container.
+
+--------------------------------------------------------------------------------
+4. PROBLEMS FACED & HOW WE RESOLVED THEM
+--------------------------------------------------------------------------------
+
+Problem 1: JDK 25 Compilation Failures & Lombok Incompatibility
+- What happened: Modern Java versions (such as JDK 25) introduced internal compiler 
+  reflection changes that broke Lombok annotation processing, causing build crashes during compilation.
+- How we resolved it: We completely refactored the backend codebase to be 100% 
+  Lombok-free. We replaced all Lombok annotations (@Data, @Getter, @Setter, @Builder, 
+  @AllArgsConstructor) with explicit, clean standard Java getters, setters, constructors, 
+  and manual builder patterns across all entities, DTOs, and services.
+
+Problem 2: Flyway Migrations Failing on Cloud Managed DBs (Aiven / Render)
+- What happened: Cloud providers like Aiven strictly enforce `sql_require_primary_key=ON`. 
+  Our earlier Flyway join tables (like `service_tags`) lacked explicit primary keys, 
+  causing deployment builds on Render to crash during Flyway startup.
+- How we resolved it: We updated and hardened our Flyway migration SQL scripts 
+  (V1 through V8), explicitly defining primary keys for all junction tables and 
+  adding composite indexes on foreign keys to ensure 100% cloud compatibility.
+
+Problem 3: Database Connection Leaks & High Latency (N+1 Query Bottlenecks)
+- What happened: Standard JPA lazy loading caused N+1 query execution problems when 
+  fetching bookings along with related Customer, Service, Provider, and City records, 
+  slowing down responses and exhausting database connection pools.
+- How we resolved it: We hardened HikariCP configuration parameters in `application.yml` 
+  and introduced Spring Data JPA `@EntityGraph` annotations on `BookingRepository` 
+  and `PaymentRepository`. This forces Hibernate to fetch required relationships in a 
+  single optimized SQL JOIN query.
+
+Problem 4: Payment UX Friction vs. Platform Security & Auditability
+- What happened: Manual admin verification for payment reference codes creates a slow, 
+  clunky experience during testing or demoing. However, approving payments automatically 
+  without record-keeping introduces fraud risks.
+- How we resolved it: We implemented a hybrid payment architecture:
+  1. Instant auto-confirmation (`AUTO_CONFIRMED`) upon UPI reference submission for zero-friction UX.
+  2. An immutable `PaymentAuditLog` table capturing every status change, timestamp, and actor.
+  3. A post-hoc Admin Reversal endpoint (`POST /api/admin/payments/{id}/reverse`) that allows 
+     admins to inspect payments after the fact and safely revert fraudulent bookings back to `PENDING`.
+
+Problem 5: API Response Lag Due to Synchronous Email Dispatch
+- What happened: Sending emails synchronously inside controller request handlers caused 
+  API requests to hang or fail whenever external SMTP servers responded slowly.
+- How we resolved it: We configured Spring's `@EnableAsync` with a dedicated thread 
+  pool executor (`AsyncConfig.java`). Now, all transactional HTML email calls run 
+  in background threads, returning instant API responses to users.
+
+--------------------------------------------------------------------------------
+SUMMARY
+--------------------------------------------------------------------------------
+ServeNow effectively balances a modern, responsive user experience with a robust, 
+hardened backend architecture. By addressing key engineering challenges—ranging from 
+JDK compatibility and database optimization to asynchronous processing and cloud-ready 
+migrations—the platform provides a scalable foundation for on-demand service marketplaces.

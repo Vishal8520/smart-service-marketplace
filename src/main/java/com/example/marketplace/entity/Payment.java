@@ -25,11 +25,14 @@ public class Payment {
     private String currency = "INR";
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20, columnDefinition = "VARCHAR(20)")
-    private PaymentStatus status = PaymentStatus.AUTO_CONFIRMED;
+    @Column(nullable = false, length = 30)
+    private PaymentStatus status = PaymentStatus.PENDING;
 
-    @Column(name = "upi_reference_id", length = 150)
+    @Column(name = "upi_reference_id", length = 150, unique = true)
     private String upiReferenceId;
+
+    @Column(name = "idempotency_key", length = 100, unique = true)
+    private String idempotencyKey;
 
     @Column(name = "confirmed_at")
     private Instant confirmedAt;
@@ -39,7 +42,7 @@ public class Payment {
     private User confirmedByAdmin;
 
     @Column(name = "auto_confirmed", nullable = false)
-    private boolean autoConfirmed = true;
+    private boolean autoConfirmed = false;
 
     @Column(name = "reversed_at")
     private Instant reversedAt;
@@ -62,14 +65,15 @@ public class Payment {
     }
 
     public Payment(Long id, Booking booking, BigDecimal amount, String currency, PaymentStatus status,
-            String upiReferenceId, Instant confirmedAt, User confirmedByAdmin, boolean autoConfirmed,
+            String upiReferenceId, String idempotencyKey, Instant confirmedAt, User confirmedByAdmin, boolean autoConfirmed,
             Instant reversedAt, User reversedByAdmin, String reversalReason, String notes, Instant createdAt) {
         this.id = id;
         this.booking = booking;
         this.amount = amount;
         this.currency = currency != null ? currency : "INR";
-        this.status = status != null ? status : PaymentStatus.AUTO_CONFIRMED;
+        this.status = status != null ? status : PaymentStatus.PENDING;
         this.upiReferenceId = upiReferenceId;
+        this.idempotencyKey = idempotencyKey;
         this.confirmedAt = confirmedAt;
         this.confirmedByAdmin = confirmedByAdmin;
         this.autoConfirmed = autoConfirmed;
@@ -89,11 +93,12 @@ public class Payment {
         private Booking booking;
         private BigDecimal amount;
         private String currency = "INR";
-        private PaymentStatus status = PaymentStatus.AUTO_CONFIRMED;
+        private PaymentStatus status = PaymentStatus.PENDING;
         private String upiReferenceId;
+        private String idempotencyKey;
         private Instant confirmedAt;
         private User confirmedByAdmin;
-        private boolean autoConfirmed = true;
+        private boolean autoConfirmed = false;
         private Instant reversedAt;
         private User reversedByAdmin;
         private String reversalReason;
@@ -127,6 +132,11 @@ public class Payment {
 
         public Builder upiReferenceId(String upiReferenceId) {
             this.upiReferenceId = upiReferenceId;
+            return this;
+        }
+
+        public Builder idempotencyKey(String idempotencyKey) {
+            this.idempotencyKey = idempotencyKey;
             return this;
         }
 
@@ -171,8 +181,8 @@ public class Payment {
         }
 
         public Payment build() {
-            return new Payment(id, booking, amount, currency, status, upiReferenceId, confirmedAt, confirmedByAdmin,
-                    autoConfirmed, reversedAt, reversedByAdmin, reversalReason, notes, createdAt);
+            return new Payment(id, booking, amount, currency, status, upiReferenceId, idempotencyKey, confirmedAt,
+                    confirmedByAdmin, autoConfirmed, reversedAt, reversedByAdmin, reversalReason, notes, createdAt);
         }
     }
 
@@ -222,6 +232,14 @@ public class Payment {
 
     public void setUpiReferenceId(String upiReferenceId) {
         this.upiReferenceId = upiReferenceId;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
     }
 
     public Instant getConfirmedAt() {

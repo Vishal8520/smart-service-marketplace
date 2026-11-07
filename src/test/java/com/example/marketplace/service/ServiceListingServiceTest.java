@@ -2,12 +2,9 @@ package com.example.marketplace.service;
 
 import com.example.marketplace.dto.request.ServiceRequest;
 import com.example.marketplace.dto.response.ServiceResponse;
-import com.example.marketplace.entity.Category;
-import com.example.marketplace.entity.RoleType;
-import com.example.marketplace.entity.ServiceListing;
-import com.example.marketplace.entity.User;
+import com.example.marketplace.entity.*;
 import com.example.marketplace.exception.UnauthorizedException;
-import com.example.marketplace.repository.ReviewRepository;
+import com.example.marketplace.repository.CityRepository;
 import com.example.marketplace.repository.ServiceListingRepository;
 import com.example.marketplace.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +32,7 @@ class ServiceListingServiceTest {
     @Mock
     private UserRepository userRepo;
     @Mock
-    private ReviewRepository reviewRepo;
+    private CityRepository cityRepo;
 
     @InjectMocks
     private ServiceListingService serviceListingService;
@@ -53,12 +50,14 @@ class ServiceListingServiceTest {
                 .email("provider@example.com")
                 .name("Bob Plumbing")
                 .role(RoleType.SERVICE_PROVIDER)
+                .kycStatus(KycStatus.APPROVED)
                 .build();
 
         otherUser = User.builder()
                 .id(2L)
                 .email("other@example.com")
                 .role(RoleType.SERVICE_PROVIDER)
+                .kycStatus(KycStatus.APPROVED)
                 .build();
 
         category = Category.builder().id(1L).name("Plumbing").build();
@@ -71,6 +70,8 @@ class ServiceListingServiceTest {
                 .description("Fixing leaky pipes quickly")
                 .price(BigDecimal.valueOf(499.00))
                 .tags(List.of("plumbing", "repair"))
+                .averageRating(4.5)
+                .reviewCount(12)
                 .active(true)
                 .build();
 
@@ -83,24 +84,43 @@ class ServiceListingServiceTest {
     }
 
     @Test
-    @DisplayName("Provider can create a new service listing")
-    void createService_Success() {
+    @DisplayName("KYC-approved provider can create a new service listing")
+    void createService_ApprovedKyc_Success() {
         when(userRepo.findByEmail(provider.getEmail())).thenReturn(Optional.of(provider));
         when(serviceRepo.save(any())).thenReturn(listing);
-        when(reviewRepo.averageRatingByServiceId(10L)).thenReturn(4.8);
 
         ServiceResponse response = serviceListingService.createService(serviceRequest, provider.getEmail());
 
         assertThat(response).isNotNull();
         assertThat(response.getTitle()).isEqualTo("Pipe Leak Repair");
-        assertThat(response.getAverageRating()).isEqualTo(4.8);
+        assertThat(response.getAverageRating()).isEqualTo(4.5);
         verify(serviceRepo, times(1)).save(any());
+    }
+
+    @Test
+    @DisplayName("Provider with PENDING KYC cannot create listing")
+    void createService_PendingKyc_ThrowsIllegalState() {
+        User pendingProvider = User.builder()
+                .id(3L)
+                .email("unapproved@example.com")
+                .role(RoleType.SERVICE_PROVIDER)
+                .kycStatus(KycStatus.PENDING)
+                .build();
+
+        when(userRepo.findByEmail(pendingProvider.getEmail())).thenReturn(Optional.of(pendingProvider));
+
+        assertThatThrownBy(() -> serviceListingService.createService(serviceRequest, pendingProvider.getEmail()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Provider account is not KYC-approved");
+
+        verify(serviceRepo, never()).save(any());
     }
 
     @Test
     @DisplayName("Updating someone else's service listing throws UnauthorizedException")
     void updateService_Unauthorized_ThrowsException() {
         when(serviceRepo.findById(10L)).thenReturn(Optional.of(listing));
+        when(userRepo.findByEmail(otherUser.getEmail())).thenReturn(Optional.of(otherUser));
 
         assertThatThrownBy(() -> serviceListingService.updateService(10L, serviceRequest, otherUser.getEmail()))
                 .isInstanceOf(UnauthorizedException.class)

@@ -3,7 +3,10 @@ package com.example.marketplace.service;
 import com.example.marketplace.dto.request.CityRequest;
 import com.example.marketplace.dto.response.CityResponse;
 import com.example.marketplace.entity.City;
+import com.example.marketplace.exception.ResourceNotFoundException;
 import com.example.marketplace.repository.CityRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +22,7 @@ public class CityService {
         this.cityRepository = cityRepository;
     }
 
+    @Cacheable("activeCities")
     @Transactional(readOnly = true)
     public List<CityResponse> getActiveCities() {
         return cityRepository.findAllByActiveTrue()
@@ -27,6 +31,7 @@ public class CityService {
                 .collect(Collectors.toList());
     }
 
+    @Cacheable("allCities")
     @Transactional(readOnly = true)
     public List<CityResponse> getAllCities() {
         return cityRepository.findAll()
@@ -35,6 +40,7 @@ public class CityService {
                 .collect(Collectors.toList());
     }
 
+    @CacheEvict(value = {"activeCities", "allCities"}, allEntries = true)
     @Transactional
     public CityResponse createCity(CityRequest request) {
         if (cityRepository.existsByNameIgnoreCase(request.getName())) {
@@ -51,10 +57,11 @@ public class CityService {
         return mapToResponse(saved);
     }
 
+    @CacheEvict(value = {"activeCities", "allCities"}, allEntries = true)
     @Transactional
     public CityResponse toggleCityActive(Long id) {
         City city = cityRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("City not found with ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("City", "id", id));
 
         city.setActive(!city.isActive());
         City saved = cityRepository.save(city);

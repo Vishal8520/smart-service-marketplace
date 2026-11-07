@@ -26,8 +26,21 @@ public class User {
     private String phone;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30, columnDefinition = "VARCHAR(30)")
+    @Column(nullable = false, length = 30)
     private RoleType role;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "kyc_status", nullable = false, length = 20)
+    private KycStatus kycStatus = KycStatus.APPROVED;
+
+    @Column(name = "kyc_notes", columnDefinition = "TEXT")
+    private String kycNotes;
+
+    @Column(name = "failed_login_attempts", nullable = false)
+    private int failedLoginAttempts = 0;
+
+    @Column(name = "account_locked_until")
+    private Instant accountLockedUntil;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -36,14 +49,23 @@ public class User {
     public User() {
     }
 
-    public User(Long id, String name, String email, String password, String phone, RoleType role, Instant createdAt) {
+    public User(Long id, String name, String email, String password, String phone, RoleType role,
+                KycStatus kycStatus, String kycNotes, int failedLoginAttempts, Instant accountLockedUntil, Instant createdAt) {
         this.id = id;
         this.name = name;
         this.email = email;
         this.password = password;
         this.phone = phone;
         this.role = role;
+        this.kycStatus = kycStatus != null ? kycStatus : KycStatus.APPROVED;
+        this.kycNotes = kycNotes;
+        this.failedLoginAttempts = failedLoginAttempts;
+        this.accountLockedUntil = accountLockedUntil;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
+    }
+
+    public User(Long id, String name, String email, String password, String phone, RoleType role, Instant createdAt) {
+        this(id, name, email, password, phone, role, KycStatus.APPROVED, null, 0, null, createdAt);
     }
 
     public static Builder builder() {
@@ -57,6 +79,10 @@ public class User {
         private String password;
         private String phone;
         private RoleType role;
+        private KycStatus kycStatus = KycStatus.APPROVED;
+        private String kycNotes;
+        private int failedLoginAttempts = 0;
+        private Instant accountLockedUntil;
         private Instant createdAt;
 
         public Builder id(Long id) {
@@ -89,14 +115,42 @@ public class User {
             return this;
         }
 
+        public Builder kycStatus(KycStatus kycStatus) {
+            this.kycStatus = kycStatus;
+            return this;
+        }
+
+        public Builder kycNotes(String kycNotes) {
+            this.kycNotes = kycNotes;
+            return this;
+        }
+
+        public Builder failedLoginAttempts(int failedLoginAttempts) {
+            this.failedLoginAttempts = failedLoginAttempts;
+            return this;
+        }
+
+        public Builder accountLockedUntil(Instant accountLockedUntil) {
+            this.accountLockedUntil = accountLockedUntil;
+            return this;
+        }
+
         public Builder createdAt(Instant createdAt) {
             this.createdAt = createdAt;
             return this;
         }
 
         public User build() {
-            return new User(id, name, email, password, phone, role, createdAt);
+            return new User(id, name, email, password, phone, role, kycStatus, kycNotes,
+                    failedLoginAttempts, accountLockedUntil, createdAt);
         }
+    }
+
+    public boolean isAccountNonLocked() {
+        if (accountLockedUntil == null) {
+            return true;
+        }
+        return Instant.now().isAfter(accountLockedUntil);
     }
 
     public Long getId() {
@@ -145,6 +199,38 @@ public class User {
 
     public void setRole(RoleType role) {
         this.role = role;
+    }
+
+    public KycStatus getKycStatus() {
+        return kycStatus;
+    }
+
+    public void setKycStatus(KycStatus kycStatus) {
+        this.kycStatus = kycStatus;
+    }
+
+    public String getKycNotes() {
+        return kycNotes;
+    }
+
+    public void setKycNotes(String kycNotes) {
+        this.kycNotes = kycNotes;
+    }
+
+    public int getFailedLoginAttempts() {
+        return failedLoginAttempts;
+    }
+
+    public void setFailedLoginAttempts(int failedLoginAttempts) {
+        this.failedLoginAttempts = failedLoginAttempts;
+    }
+
+    public Instant getAccountLockedUntil() {
+        return accountLockedUntil;
+    }
+
+    public void setAccountLockedUntil(Instant accountLockedUntil) {
+        this.accountLockedUntil = accountLockedUntil;
     }
 
     public Instant getCreatedAt() {

@@ -6,7 +6,6 @@ import com.example.marketplace.entity.*;
 import com.example.marketplace.exception.ResourceNotFoundException;
 import com.example.marketplace.exception.UnauthorizedException;
 import com.example.marketplace.repository.CityRepository;
-import com.example.marketplace.repository.ReviewRepository;
 import com.example.marketplace.repository.ServiceListingRepository;
 import com.example.marketplace.repository.UserRepository;
 import org.springframework.data.domain.Page;
@@ -19,19 +18,18 @@ public class ServiceListingService {
 
     private final ServiceListingRepository serviceRepo;
     private final UserRepository userRepo;
-    private final ReviewRepository reviewRepo;
     private final CityRepository cityRepo;
 
     public ServiceListingService(ServiceListingRepository serviceRepo, UserRepository userRepo,
-            ReviewRepository reviewRepo, CityRepository cityRepo) {
+                                 CityRepository cityRepo) {
         this.serviceRepo = serviceRepo;
         this.userRepo = userRepo;
-        this.reviewRepo = reviewRepo;
         this.cityRepo = cityRepo;
     }
 
+    @Transactional(readOnly = true)
     public Page<ServiceResponse> searchServices(String keyword, Long categoryId, Long cityId, String tag,
-            Pageable pageable) {
+                                                Pageable pageable) {
         Page<ServiceListing> page;
         if (keyword != null && !keyword.isBlank()) {
             page = serviceRepo.searchActiveAndApprovedServices(keyword, ServiceStatus.APPROVED, pageable);
@@ -50,9 +48,9 @@ public class ServiceListingService {
 
     @Transactional
     public ServiceResponse createService(ServiceRequest request, String providerEmail) {
-        String emailToUse = (request.getProviderEmail() != null && !request.getProviderEmail().isBlank())
-                ? request.getProviderEmail()
-                : providerEmail;
+        String emailToUse = (providerEmail != null && !providerEmail.isBlank())
+                ? providerEmail
+                : request.getProviderEmail();
 
         if (emailToUse == null || emailToUse.isBlank()) {
             emailToUse = "provider.default@marketplace.com";
@@ -64,9 +62,16 @@ public class ServiceListingService {
                     .name("Service Provider")
                     .email(finalEmail)
                     .role(RoleType.SERVICE_PROVIDER)
+                    .kycStatus(KycStatus.PENDING)
                     .build();
             return userRepo.save(newUser);
         });
+
+        // Provider KYC verification check: only KYC-approved providers or admins can create listings
+        if (provider.getRole() == RoleType.SERVICE_PROVIDER && provider.getKycStatus() != KycStatus.APPROVED) {
+            throw new IllegalStateException("Provider account is not KYC-approved (status: "
+                    + provider.getKycStatus() + "). Admin KYC approval is required before publishing service listings.");
+        }
 
         Category category = new Category();
         category.setId(request.getCategoryId());
@@ -90,6 +95,8 @@ public class ServiceListingService {
                 .price(request.getPrice())
                 .status(initialStatus)
                 .active(initialStatus == ServiceStatus.APPROVED)
+                .averageRating(0.0)
+                .reviewCount(0)
                 .build();
 
         return toResponse(serviceRepo.save(listing));
@@ -100,8 +107,11 @@ public class ServiceListingService {
         ServiceListing listing = getListingById(id);
 
         if (listing.getProvider() != null && listing.getProvider().getEmail() != null
-                && !listing.getProvider().getEmail().equals(providerEmail)) {
-            throw new UnauthorizedException("You do not own this service listing");
+                && !listing.getProvider().getEmail().equalsIgnoreCase(providerEmail)) {
+            User user = userRepo.findByEmail(providerEmail).orElse(null);
+            if (user == null || user.getRole() != RoleType.ADMIN) {
+                throw new UnauthorizedException("You do not own this service listing");
+            }
         }
 
         Category category = new Category();
@@ -124,10 +134,18 @@ public class ServiceListingService {
     @Transactional
     public void deleteService(Long id, String providerEmail) {
         ServiceListing listing = getListingById(id);
+        if (listing.getProvider() != null && listing.getProvider().getEmail() != null
+                && !listing.getProvider().getEmail().equalsIgnoreCase(providerEmail)) {
+            User user = userRepo.findByEmail(providerEmail).orElse(null);
+            if (user == null || user.getRole() != RoleType.ADMIN) {
+                throw new UnauthorizedException("You do not own this service listing");
+            }
+        }
         listing.setActive(false);
         serviceRepo.save(listing);
     }
 
+    @Transactional(readOnly = true)
     public ServiceResponse getService(Long id) {
         return toResponse(getListingById(id));
     }
@@ -137,8 +155,11 @@ public class ServiceListingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Service", "id", id));
     }
 
+    /**
+     * Maps entity to response DTO without triggering N+1 query.
+     * Uses precomputed averageRating stored directly on ServiceListing entity.
+     */
     public ServiceResponse toResponse(ServiceListing s) {
-        Double avgRating = reviewRepo.averageRatingByServiceId(s.getId());
         return ServiceResponse.builder()
                 .id(s.getId())
                 .providerId(s.getProvider() != null ? s.getProvider().getId() : null)
@@ -154,7 +175,7 @@ public class ServiceListingService {
                 .tags(s.getTags())
                 .price(s.getPrice())
                 .active(s.isActive())
-                .averageRating(avgRating != null ? avgRating : 4.8)
+                .averageRating(s.getAverageRating() != null ? s.getAverageRating() : 0.0)
                 .createdAt(s.getCreatedAt())
                 .build();
     }
