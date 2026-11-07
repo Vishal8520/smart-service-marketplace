@@ -9,7 +9,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 10
-      minimum-idle: 5
+      minimum-idle: 1
       idle-timeout: 30000
       max-lifetime: 1800000
       connection-timeout: 20000
@@ -19,11 +19,13 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     show-sql: false
     properties:
       hibernate:
         format_sql: false
+        temp:
+          use_jdbc_metadata_defaults: false
 
   flyway:
     enabled: true
