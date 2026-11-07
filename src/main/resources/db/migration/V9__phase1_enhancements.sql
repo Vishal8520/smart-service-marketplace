@@ -17,7 +17,19 @@ BEGIN
         ALTER TABLE payments ADD COLUMN idempotency_key VARCHAR(100) NULL;
     END IF;
 
-    -- 2. Add unique constraint on payments(idempotency_key)
+    -- 2. Deduplicate and add unique constraint on payments(idempotency_key)
+    UPDATE payments SET idempotency_key = NULL WHERE idempotency_key = '';
+
+    UPDATE payments p1
+    JOIN (
+        SELECT idempotency_key, MIN(id) AS min_id
+        FROM payments
+        WHERE idempotency_key IS NOT NULL
+        GROUP BY idempotency_key
+        HAVING COUNT(*) > 1
+    ) dup ON p1.idempotency_key = dup.idempotency_key AND p1.id > dup.min_id
+    SET p1.idempotency_key = CONCAT(LEFT(p1.idempotency_key, 80), '-dup-', p1.id);
+
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.STATISTICS 
         WHERE TABLE_SCHEMA = DATABASE() 
@@ -27,7 +39,19 @@ BEGIN
         CREATE UNIQUE INDEX uq_payments_idempotency_key ON payments(idempotency_key);
     END IF;
 
-    -- 3. Add unique constraint on payments(upi_reference_id) to prevent reference reuse
+    -- 3. Deduplicate existing legacy duplicate references before creating unique index
+    UPDATE payments SET upi_reference_id = NULL WHERE upi_reference_id = '';
+
+    UPDATE payments p1
+    JOIN (
+        SELECT upi_reference_id, MIN(id) AS min_id
+        FROM payments
+        WHERE upi_reference_id IS NOT NULL
+        GROUP BY upi_reference_id
+        HAVING COUNT(*) > 1
+    ) dup ON p1.upi_reference_id = dup.upi_reference_id AND p1.id > dup.min_id
+    SET p1.upi_reference_id = CONCAT(LEFT(p1.upi_reference_id, 80), '-dup-', p1.id);
+
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.STATISTICS 
         WHERE TABLE_SCHEMA = DATABASE() 
